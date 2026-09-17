@@ -6,6 +6,9 @@ All notable changes to traust-ledger are documented here.
 
 ## Changes
 
+- Pin traust-contracts v0.5.0 (evidence projection + postgres storage
+  namespace).
+
 - **Two write-path verbs are now reachable over REST**, so remote consumers
   (the Go SDK) can drive them the way in-process Python already could:
   - `POST /v1/ledger/layers/{layer_id}/stamp` — backfill event fingerprints
