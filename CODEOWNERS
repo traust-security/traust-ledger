@@ -1,17 +1,17 @@
 # Reviewer routing — pair with the forge's branch protection:
-#   (owners are the @openshift/traust-maintainers team; adjust to your fork)
+#   (owners are the @traust-security/traust-admins team; adjust to your fork)
 #   - Require CODEOWNERS approval on main
 #   - Require pipeline success before merge
 #
 
-/src/traust_ledger/ @openshift/traust-maintainers
-/tests/ @openshift/traust-maintainers
+/src/traust_ledger/ @traust-security/traust-admins
+/tests/ @traust-security/traust-admins
 
-/.gitlab-ci.yml @openshift/traust-maintainers
-/.githooks/ @openshift/traust-maintainers
-/CODEOWNERS @openshift/traust-maintainers
-/ci/gates.py @openshift/traust-maintainers
-/release.py @openshift/traust-maintainers
-/Makefile @openshift/traust-maintainers
+/.gitlab-ci.yml @traust-security/traust-admins
+/.githooks/ @traust-security/traust-admins
+/CODEOWNERS @traust-security/traust-admins
+/ci/gates.py @traust-security/traust-admins
+/release.py @traust-security/traust-admins
+/Makefile @traust-security/traust-admins
 
-* @openshift/traust-maintainers
+* @traust-security/traust-admins
