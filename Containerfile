@@ -85,7 +85,7 @@ FROM registry.access.redhat.com/hi/python:3.12@sha256:91c451682f9c8dbe04d909e357
 # OCI labels. VERSION and SOURCE_REVISION are supplied by the build.
 ARG SOURCE_REVISION=unknown
 ARG VERSION=unknown
-LABEL org.opencontainers.image.source="https://github.com/openshift/traust-ledger" \
+LABEL org.opencontainers.image.source="https://github.com/traust-security/traust-ledger" \
       org.opencontainers.image.revision="${SOURCE_REVISION}" \
       org.opencontainers.image.title="traust-ledger" \
       org.opencontainers.image.version="${VERSION}" \
@@ -93,7 +93,7 @@ LABEL org.opencontainers.image.source="https://github.com/openshift/traust-ledge
       name="traust/traust-ledger" \
       version="${VERSION}" \
       vendor="Traust maintainers" \
-      url="https://github.com/openshift/traust-ledger" \
+      url="https://github.com/traust-security/traust-ledger" \
       summary="Traust disposition-ledger service" \
       description="Disposition-ledger kernel: finding identity, event math, integrity (Merkle + signing), and the single ledger write path." \
       io.k8s.description="Traust disposition-ledger service." \
