@@ -85,6 +85,32 @@ def _cwe_list(finding: dict) -> list[str]:
     return [single] if isinstance(single, str) and single else []
 
 
+def policy_check(finding: dict) -> str:
+    """A policy-scan finding's check id, or "" when it has none.
+
+    IaC findings are separated by the CHECK, not by path and CWE. Measured
+    2026-09-18 across 2,592 cloud-config findings: anchoring on resource and
+    CWE alone gave 1,565 identities for 2,592 findings -- 53.9% sharing an
+    identity, so 20 distinct policy violations on one Pod (privileged
+    container, missing limits, host network, ...) all collapsed to a single
+    value and a disposition on one silently covered the other nineteen.
+    That is the same failure `strict` mode exists to prevent, at the same
+    scale (369/1,396 here against 433/1,397 then).
+
+    With the check appended: 2,564 identities, 56 findings sharing one -- and
+    all 28 of those groups have IDENTICAL titles, i.e. the same check on the
+    same resource split across file sets by the scanner. Collapsing those is
+    correct; they are one finding expressed twice.
+
+    APPENDED ONLY WHEN PRESENT, which is what keeps ALGO_VERSION still. No
+    code-audit finding carries `check_id`, so every stamped input keeps its
+    exact payload. Making it an unconditional empty component instead would
+    add a trailing separator to all 120,225 existing stamps and force a v4.
+    """
+    value = finding.get("check_id")
+    return ascii_upper(value.strip()) if isinstance(value, str) else ""
+
+
 def location_anchor(location: dict) -> str:
     """The identity anchor for one location: `path`, else `resource`.
 
@@ -200,7 +226,10 @@ def fingerprint(finding: dict, repo_url: str | None, *, strict: bool = False) ->
             "pseudo-path from traust-contracts enums/v1/repo-scope-path.json "
             "when it genuinely concerns no artifact."
         )
-    payload = "|".join([canon_repo(repo_url), ";".join(paths), primary_cwe(finding)])
+    components = [canon_repo(repo_url), ";".join(paths), primary_cwe(finding)]
+    if check := policy_check(finding):
+        components.append(check)
+    payload = "|".join(components)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -245,8 +274,14 @@ def _paths_v3(finding: dict) -> list[str]:
 
 
 def _cwe_current(finding: dict) -> str:
-    """The current recipe's CWE pick, including the singular `cwe` alias."""
-    return primary_cwe(finding)
+    """The current recipe's third component: CWE, plus the check when present.
+
+    The ladder rungs are (paths, cwe) pairs, so the conditional fourth
+    component rides here rather than changing the tuple shape for every
+    frozen rung. Frozen rungs must NOT call this.
+    """
+    cwe = primary_cwe(finding)
+    return f"{cwe}|{check}" if (check := policy_check(finding)) else cwe
 
 
 def _paths_v2(finding: dict) -> list[str]:

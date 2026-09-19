@@ -197,3 +197,57 @@ def test_frozen_rungs_cannot_see_inputs_their_recipe_never_read() -> None:
     paths_of, cwe_of = rungs["v3"]
     assert paths_of(resource_only) == ["RoleBinding.ns.name"]
     assert cwe_of(resource_only) == "CWE-284"
+
+
+# --- policy check id ------------------------------------------------------
+
+
+def test_the_check_separates_findings_on_one_resource() -> None:
+    """20 distinct policy violations on one Pod collapsed to a single identity
+    without this: a disposition on one silently covered the other nineteen."""
+    base = _cc_finding(["Pod.default.app"], cwe="CWE-250")
+    a = {**base, "check_id": "CKV_K8S_11"}
+    b = {**base, "check_id": "CKV_K8S_12"}
+    assert fingerprint(a, REPO) != fingerprint(b, REPO)
+    assert fingerprint(a, REPO) == fingerprint({**base, "check_id": "ckv_k8s_11"}, REPO)
+
+
+def test_the_check_is_appended_only_when_present() -> None:
+    """This is what keeps ALGO_VERSION still: no code-audit finding carries a
+    check_id, so every already-stamped input keeps its exact payload."""
+    code = {"locations": [{"path": "a/b.go"}], "cwes": ["CWE-79"]}
+    assert fingerprint(code, REPO) == _hash(REPO, ["a/b.go"], "CWE-79")
+    assert fingerprint({**code, "check_id": ""}, REPO) == _hash(REPO, ["a/b.go"], "CWE-79")
+    assert fingerprint({**code, "check_id": None}, REPO) == _hash(REPO, ["a/b.go"], "CWE-79")
+
+
+def test_a_check_changes_the_payload_only_for_findings_that_have_one() -> None:
+    with_check = {"locations": [{"path": "a/b.go"}], "cwes": ["CWE-79"], "check_id": "CKV_1"}
+    assert fingerprint(with_check, REPO) == _hash(REPO, ["a/b.go"], "CWE-79|CKV_1")
+
+
+def test_the_same_check_on_the_same_resource_stays_one_identity() -> None:
+    """The scanner splits one violation across file sets; those are the same
+    finding and must collapse. All 28 real collision groups are this shape."""
+    a = _cc_finding(["Spec.api.types"], cwe="CWE-20", file_paths=["/api/v1/types.json"])
+    b = _cc_finding(["Spec.api.types"], cwe="CWE-20", file_paths=["/tooling/openapi.yaml"])
+    a["check_id"] = b["check_id"] = "CKV_OPENAPI_21"
+    assert fingerprint(a, REPO) == fingerprint(b, REPO)
+
+
+def test_frozen_rungs_never_see_the_check() -> None:
+    """A v2 rung that read check_id would attribute stamps to a recipe that
+    provably could not have minted them."""
+    finding = {"locations": [{"path": "a/b.go"}], "cwes": ["CWE-79"], "check_id": "CKV_1"}
+    rungs = {v: (p, c) for v, p, c in ALGO_LADDER}
+    for frozen in ("v2", "v1"):
+        _, cwe_of = rungs[frozen]
+        assert cwe_of(finding) == "CWE-79", f"{frozen} leaked the check into its payload"
+    _, cwe_of = rungs["v3"]
+    assert cwe_of(finding) == "CWE-79|CKV_1"
+
+
+def test_attribution_still_recognises_a_checked_stamp_as_current() -> None:
+    finding = _cc_finding(["Pod.default.app"], cwe="CWE-250")
+    finding["check_id"] = "CKV_K8S_11"
+    assert attribute(finding, fingerprint(finding, REPO), [REPO]) == ALGO_VERSION

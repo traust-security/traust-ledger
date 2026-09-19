@@ -1,6 +1,6 @@
 [project]
 name = "traust-ledger"
-version = "0.5.0"
+version = "0.6.0"
 license = "Apache-2.0"
 description = "Disposition-ledger kernel: finding identity, event math, integrity (Merkle + signing), and the single ledger write path"
 requires-python = ">=3.11"
