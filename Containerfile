@@ -80,7 +80,7 @@ FROM registry.access.redhat.com/hi/cosign:latest@sha256:df8a3f9bbea6e7bcfcf0813c
 # Minimal hardened Python runtime. Runs as a non-root user (UID 1001) by
 # default and ships no package manager, so nothing is installed here.
 # Python minor must match the builder stage above (see note there).
-FROM registry.access.redhat.com/hi/python:3.12@sha256:91c451682f9c8dbe04d909e357f7696b92894702b72d54e5c2d622a9e4306c3c AS runtime
+FROM registry.access.redhat.com/hi/python:3.12@sha256:65b88fd52b1133a118c9085a90cc3c6d940c83d2c5073523ccde34f23366c0e2 AS runtime
 
 # OCI labels. VERSION and SOURCE_REVISION are supplied by the build.
 ARG SOURCE_REVISION=unknown
