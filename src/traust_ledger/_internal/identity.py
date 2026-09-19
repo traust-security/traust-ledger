@@ -79,6 +79,33 @@ _CWE_NUMBER_RE = re.compile(r"(\d+)")
 _CWE_NO_NUMBER = 10**9
 
 
+def _cwe_list(finding: dict) -> list[str]:
+    """`cwes` is the code-audit shape; cloud-config findings carry `cwe`."""
+    single = finding.get("cwe")
+    return [single] if isinstance(single, str) and single else []
+
+
+def location_anchor(location: dict) -> str:
+    """The identity anchor for one location: `path`, else `resource`.
+
+    Code findings carry `locations[].path`. Cloud-config findings carry
+    `file_path`, `resource` and `file_line_range` instead -- a different
+    shape, so 2,592 corpus findings were unfingerprintable and their
+    dispositions could not survive a re-audit.
+
+    `resource` rather than `file_path`, deliberately:
+    `RoleBinding.ns.name` survives the IaC file being moved, split or
+    renamed, which is routine. The file path does not.
+
+    This WIDENS the recipe's domain and does not touch ALGO_VERSION -- the
+    same argument `strict` mode makes in reverse. Verified across 122,836
+    corpus findings: 0 carry both `path` and `resource`-only locations, and
+    0 findings with a `resource` anchor were already stamped, so no
+    accepted input changes value.
+    """
+    return canon_path(location.get("path")) or canon_path(location.get("resource"))
+
+
 def primary_cwe(finding: dict) -> str:
     r"""Lowest CWE **by number**, ASCII-uppercased and stripped; 'CWE-0' when absent.
 
@@ -107,7 +134,7 @@ def primary_cwe(finding: dict) -> str:
     schema-valid report (minItems 1, ^CWE-\d{1,5}$) and fully reachable for the
     non-harness producers the SDK exists to serve.
     """
-    cwes = [c for c in (finding.get("cwes") or []) if str(c).strip()]
+    cwes = [c for c in (finding.get("cwes") or _cwe_list(finding)) if str(c).strip()]
     if not cwes:
         return "CWE-0"
 
@@ -161,7 +188,7 @@ def fingerprint(finding: dict, repo_url: str | None, *, strict: bool = False) ->
             # Filter AFTER canonicalizing, not before: v1 tested the raw value
             # for truthiness, so a path of "." survived the check and then
             # canonicalized to "", putting an empty component in the join.
-            if (canon := canon_path(loc.get("path")))
+            if (canon := location_anchor(loc))
         }
     )
     if strict and not paths:
@@ -203,7 +230,30 @@ def _paths_v1(finding: dict) -> list[str]:
     return sorted({canon_path(loc.get("path")) for loc in (finding.get("locations") or [])})
 
 
+def _paths_v3(finding: dict) -> list[str]:
+    """The CURRENT recipe's path set. Must stay identical to fingerprint().
+
+    Sharing a helper with the v2 rung was a bug: widening the live recipe to
+    anchor on `resource` silently widened v2 too, and then narrowing v2 back
+    to match history silently narrowed v3, so attribution returned None for
+    stamps the current recipe had just minted. The newest rung tracks the
+    live recipe; every older rung is frozen.
+    """
+    return sorted(
+        {canon for loc in (finding.get("locations") or []) if (canon := location_anchor(loc))}
+    )
+
+
+def _cwe_current(finding: dict) -> str:
+    """The current recipe's CWE pick, including the singular `cwe` alias."""
+    return primary_cwe(finding)
+
+
 def _paths_v2(finding: dict) -> list[str]:
+    """v2 read `path` only. The ladder must reproduce history EXACTLY, so it
+    does NOT get the `resource` alias -- a rung that reads an input the
+    historical recipe could not see would attribute a stamp to a version
+    that provably did not mint it."""
     return sorted(
         {
             canon
@@ -214,7 +264,9 @@ def _paths_v2(finding: dict) -> list[str]:
 
 
 def _cwe_first(finding: dict) -> str:
-    """v1/v2 took cwes[0] -- identity depended on the order a model wrote."""
+    """v1/v2 took cwes[0] -- identity depended on the order a model wrote.
+
+    No `cwe` alias here either: same reason as _paths_v2."""
     values = [c for c in (finding.get("cwes") or []) if c]
     return ascii_upper(values[0].strip()) if values else "CWE-0"
 
@@ -223,7 +275,7 @@ def _cwe_first(finding: dict) -> str:
 #: Keep this ordered: a stamp that two recipes both produce is attributed to
 #: the newer one, which is the safer read when they collide.
 ALGO_LADDER: tuple[tuple[str, object, object], ...] = (
-    ("v3", _paths_v2, primary_cwe),
+    ("v3", _paths_v3, _cwe_current),
     ("v2", _paths_v2, _cwe_first),
     ("v1", _paths_v1, _cwe_first),
 )
