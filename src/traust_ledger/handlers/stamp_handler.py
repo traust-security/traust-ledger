@@ -25,8 +25,6 @@ def stamp_event_identities(
     *fingerprints* maps finding_ref -> fingerprint (the harness is the sole
     producer). Returns the new Merkle root, the layer id, and the count stamped.
     """
-    stamped = sum(
-        1 for event in layer.get("events") or [] if attach_identity(event, fingerprints)
-    )
+    stamped = sum(1 for event in layer.get("events") or [] if attach_identity(event, fingerprints))
     merkle_root = finalize_layer(layer, config, layer_id=layer_id)
     return {"merkle_root": merkle_root, "layer_id": layer_id, "stamped": stamped}

@@ -50,8 +50,12 @@ def _human(identity: str = "alice", *, verified: bool = True) -> LayerActor:
 def test_countersign_records_false_positive(tmp_path: Path) -> None:
     _seed(tmp_path)
     _client(tmp_path).countersign(
-        LAYER_ID, "F-1", rationale=RATIONALE, recorded_at=AT,
-        decision="false_positive", actor=_human(),
+        LAYER_ID,
+        "F-1",
+        rationale=RATIONALE,
+        recorded_at=AT,
+        decision="false_positive",
+        actor=_human(),
     )
     ev = _reload(tmp_path)["events"][-1]
     assert ev["disposition"]["validity"] == "false_positive"
@@ -61,8 +65,12 @@ def test_countersign_records_false_positive(tmp_path: Path) -> None:
 def test_countersign_records_severity(tmp_path: Path) -> None:
     _seed(tmp_path)
     _client(tmp_path).countersign(
-        LAYER_ID, "F-1", rationale=RATIONALE, recorded_at=AT,
-        severity="high", actor=_human(),
+        LAYER_ID,
+        "F-1",
+        rationale=RATIONALE,
+        recorded_at=AT,
+        severity="high",
+        actor=_human(),
     )
     ev = _reload(tmp_path)["events"][-1]
     assert ev["disposition"] == {"severity": "high"}
@@ -72,8 +80,12 @@ def test_countersign_rejects_unverified_false_positive(tmp_path: Path) -> None:
     _seed(tmp_path)
     with pytest.raises(LedgerError):
         _client(tmp_path).countersign(
-            LAYER_ID, "F-1", rationale=RATIONALE, recorded_at=AT,
-            decision="false_positive", actor=_human(verified=False),
+            LAYER_ID,
+            "F-1",
+            rationale=RATIONALE,
+            recorded_at=AT,
+            decision="false_positive",
+            actor=_human(verified=False),
         )
     assert _reload(tmp_path)["events"] == []
 

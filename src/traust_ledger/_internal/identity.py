@@ -175,3 +175,92 @@ def fingerprint(finding: dict, repo_url: str | None, *, strict: bool = False) ->
         )
     payload = "|".join([canon_repo(repo_url), ";".join(paths), primary_cwe(finding)])
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# Attribution — which historical recipe minted an existing stamp
+# ---------------------------------------------------------------------------
+#
+# Stamps written before 2026-09-18 carry no fingerprint_algo, so nothing on
+# disk says which recipe produced them. That was answerable only by trying
+# every recipe against every finding, which works while the set of
+# candidates is small and stops working the moment it is not.
+#
+# This makes the trying explicit and bounded. The set is CLOSED: every stamp
+# written from now on self-declares its version, so the ladder only ever has
+# to cover history, and history does not grow.
+#
+# Measured across the corpus 2026-09-18 (25,515 report stamps):
+#   v3  21,478 (84.2%)   v2  3,909 (15.3%)   v1  56 (0.2%)
+#   + 72 minted from an un-normalized repository string, which is a property
+#     of the INPUT rather than of the recipe -- see repo_candidates below.
+#   unattributed: 0
+
+
+def _paths_v1(finding: dict) -> list[str]:
+    """v1 tested the RAW path for truthiness, so '.' survived and canonicalized
+    to '', putting an empty component in the join."""
+    return sorted({canon_path(loc.get("path")) for loc in (finding.get("locations") or [])})
+
+
+def _paths_v2(finding: dict) -> list[str]:
+    return sorted(
+        {
+            canon
+            for loc in (finding.get("locations") or [])
+            if (canon := canon_path(loc.get("path")))
+        }
+    )
+
+
+def _cwe_first(finding: dict) -> str:
+    """v1/v2 took cwes[0] -- identity depended on the order a model wrote."""
+    values = [c for c in (finding.get("cwes") or []) if c]
+    return ascii_upper(values[0].strip()) if values else "CWE-0"
+
+
+#: Newest first, so attribution reports the most recent recipe that matches.
+#: Keep this ordered: a stamp that two recipes both produce is attributed to
+#: the newer one, which is the safer read when they collide.
+ALGO_LADDER: tuple[tuple[str, object, object], ...] = (
+    ("v3", _paths_v2, primary_cwe),
+    ("v2", _paths_v2, _cwe_first),
+    ("v1", _paths_v1, _cwe_first),
+)
+
+
+def _hash(repo_url: str | None, paths: list[str], cwe: str) -> str:
+    import hashlib
+
+    return hashlib.sha256(
+        "|".join([canon_repo(repo_url), ";".join(paths), cwe]).encode("utf-8")
+    ).hexdigest()
+
+
+def attribute(
+    finding: dict, stamp: str, repo_candidates: list[str | None] | tuple[str | None, ...]
+) -> str | None:
+    """Which recipe version produced `stamp`, or None if no known one did.
+
+    `repo_candidates` exists because the repository string itself has a
+    history: 72 corpus stamps were minted from a value like
+    `<https://host/org/repo>` before normalize_repository stripped the
+    autolink brackets. That is an INPUT state, not a recipe version, so it
+    multiplies the candidates rather than adding a rung to the ladder.
+    Pass every plausible spelling; the first that reproduces wins.
+
+    Returns the ALGO version only. A caller that needs to know WHICH repo
+    string matched should re-run the winning rung itself -- attribution
+    answers "is this stamp accounted for", not "reconstruct the inputs".
+    """
+    # No early return for an empty stamp: no digest equals "", so the loop
+    # already yields None. A guard here would be untestable by construction.
+    seen: list[str | None] = []
+    for candidate in repo_candidates:
+        if candidate in seen:
+            continue
+        seen.append(candidate)
+        for version, paths_of, cwe_of in ALGO_LADDER:
+            if _hash(candidate, paths_of(finding), cwe_of(finding)) == stamp:
+                return version
+    return None
