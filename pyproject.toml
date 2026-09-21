@@ -1,13 +1,13 @@
 [project]
 name = "traust-ledger"
-version = "0.6.25"
+version = "0.6.26"
 license = "Apache-2.0"
 description = "Disposition-ledger kernel: finding identity, event math, integrity (Merkle + signing), and the single ledger write path"
 requires-python = ">=3.11"
 dependencies = [
     # 0.1.1 is the floor: LayerEvent timestamps are IsoTimestamp there, which is
     # what lets the read paths here drop their own parse guards.
-    "traust-contracts>=0.26.0",
+    "traust-contracts>=0.27.0",
     "jsonschema>=4.0",
     # Authentication is on the path of every write (LedgerClient -> Authenticator
     # -> verifier), so the JWT library is not optional. It sat in the `cli` and
@@ -31,7 +31,7 @@ cli = ["httpx2"]
 ledger = "traust_ledger.cli.main:main"
 
 [tool.uv.sources]
-traust-contracts = { git = "https://github.com/traust-security/traust-contracts.git", tag = "v0.26.0" }
+traust-contracts = { git = "https://github.com/traust-security/traust-contracts.git", tag = "v0.27.0" }
 
 
 [build-system]
