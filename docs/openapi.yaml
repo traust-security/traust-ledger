@@ -372,6 +372,201 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /v1/ledger/layers/{layer_id}/submit:
+    post:
+      summary: Post Submit
+      operationId: post_submit_v1_ledger_layers__layer_id__submit_post
+      parameters:
+      - name: layer_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Layer Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchSubmitRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitResponse'
+        '401':
+          description: Missing or invalid authentication credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '422':
+          description: Validation error or identity rule violation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+  /v1/ledger/fingerprint:
+    post:
+      summary: Post Fingerprint
+      operationId: post_fingerprint_v1_ledger_fingerprint_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FingerprintRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FingerprintResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/ledger/layers:
+    get:
+      summary: List Layers
+      operationId: list_layers_v1_ledger_layers_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LayerListResponse'
+        '401':
+          description: Missing or invalid authentication credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+  /v1/ledger/layers/{layer_id}/sign:
+    post:
+      summary: Sign Layer Endpoint
+      operationId: sign_layer_endpoint_v1_ledger_layers__layer_id__sign_post
+      parameters:
+      - name: layer_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Layer Id
+      - name: rekor
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Upload signature to transparency log
+          default: false
+          title: Rekor
+        description: Upload signature to transparency log
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Sign Layer Endpoint V1 Ledger Layers  Layer Id  Sign
+                  Post
+        '401':
+          description: Missing or invalid authentication credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: Layer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '500':
+          description: Signing failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/ledger/layers/{layer_id}/stamp:
+    post:
+      summary: Stamp Layer Endpoint
+      operationId: stamp_layer_endpoint_v1_ledger_layers__layer_id__stamp_post
+      parameters:
+      - name: layer_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Layer Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StampRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StampResponse'
+        '401':
+          description: Missing or invalid authentication credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: Layer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '500':
+          description: Signing failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/ledger/whoami:
+    get:
+      summary: Return the token-verified actor for the caller
+      operationId: whoami_endpoint_v1_ledger_whoami_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LayerActor'
+        '401':
+          description: Missing or invalid authentication credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
 components:
   schemas:
     Assurance:
@@ -382,6 +577,33 @@ components:
       - machine_verified
       - claimed
       title: Assurance
+    BatchSubmitRequest:
+      properties:
+        source_ref:
+          type: string
+          title: Source Ref
+        recorded_at:
+          type: string
+          title: Recorded At
+        events:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Events
+          default: []
+        needs_review:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Needs Review
+          default: []
+      type: object
+      required:
+      - source_ref
+      - recorded_at
+      title: BatchSubmitRequest
     BulkFindingsResponse:
       properties:
         layers:
@@ -566,6 +788,39 @@ components:
       - by_validity
       - by_resolution
       title: FindingsSummary
+    FingerprintRequest:
+      properties:
+        findings:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Findings
+        repository:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Repository
+      type: object
+      required:
+      - findings
+      title: FingerprintRequest
+    FingerprintResponse:
+      properties:
+        findings:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Findings
+        stamped_count:
+          type: integer
+          title: Stamped Count
+      type: object
+      required:
+      - findings
+      - stamped_count
+      title: FingerprintResponse
     HTTPValidationError:
       properties:
         detail:
@@ -584,6 +839,55 @@ components:
       required:
       - status
       title: HealthResponse
+    LayerActor:
+      properties:
+        kind:
+          type: string
+          title: Kind
+        identity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Identity
+        ldap_verified:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Ldap Verified
+        identity_verified:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Identity Verified
+        identity_provider:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Identity Provider
+        identity_issuer:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Identity Issuer
+        identity_subject:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Identity Subject
+        employee_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Employee Status
+        display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Display Name
+      type: object
+      required:
+      - kind
+      title: LayerActor
     LayerFindings:
       properties:
         layer_id:
@@ -616,6 +920,17 @@ components:
       - findings
       - summary
       title: LayerFindings
+    LayerListResponse:
+      properties:
+        layers:
+          items:
+            type: string
+          type: array
+          title: Layers
+      type: object
+      required:
+      - layers
+      title: LayerListResponse
     ResolutionCounts:
       properties:
         open:
@@ -704,6 +1019,35 @@ components:
       - by
       - at
       title: SeverityOverride
+    StampRequest:
+      properties:
+        fingerprints:
+          additionalProperties:
+            type: string
+          type: object
+          title: Fingerprints
+      type: object
+      required:
+      - fingerprints
+      title: StampRequest
+    StampResponse:
+      properties:
+        merkle_root:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Merkle Root
+        layer_id:
+          type: string
+          title: Layer Id
+        stamped:
+          type: integer
+          title: Stamped
+      type: object
+      required:
+      - layer_id
+      - stamped
+      title: StampResponse
     SubmitResponse:
       properties:
         id:
@@ -722,6 +1066,16 @@ components:
           - type: string
           - type: 'null'
           title: Merkle Root
+        event_ids:
+          items:
+            type: string
+          type: array
+          title: Event Ids
+          default: []
+        queue_added:
+          type: integer
+          title: Queue Added
+          default: 0
       type: object
       required:
       - id

@@ -29,6 +29,8 @@ from traust_contracts.v1.enums import (
 )
 from traust_contracts.v1.models.layer import LayerEvent
 
+from traust_ledger.errors import CorruptStoredEventError
+
 RESOLUTION_TIERS: dict[str, int] = {
     SourceType.VERIFICATION_REPORT: 0,
     "jira": 1,
@@ -81,7 +83,21 @@ def event_class(event: LayerEvent | dict) -> int:
 
 
 def _event_dt(event: LayerEvent) -> datetime:
-    return datetime.fromisoformat(event.recorded_at)
+    """Sortable instant for an event.
+
+    IsoTimestamp makes recorded_at RFC 3339, so this should never fail and no
+    normalization is needed — aware datetimes compare by instant. It is still
+    guarded because validation is reachable around: model_construct skips it,
+    and _coerce passes already-typed events through unvalidated. Reaching the
+    raise means an invariant broke, so it names the event rather than letting
+    a bare ValueError surface as an anonymous 500.
+    """
+    try:
+        return datetime.fromisoformat(event.recorded_at)
+    except (TypeError, ValueError) as exc:
+        raise CorruptStoredEventError(
+            event_id=event.event_id, field="recorded_at", value=event.recorded_at
+        ) from exc
 
 
 def derive_disposition(

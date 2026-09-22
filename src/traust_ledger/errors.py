@@ -154,12 +154,23 @@ class InvalidLayerIdError(ServiceError):
     message = "layer_id contains invalid characters"
 
 
+class CorruptStoredEventError(InternalError):
+    """A stored event violates a contract invariant it should not be able to.
+
+    Raised on read, so the message must identify the event: without it the
+    failure is an anonymous 500 over a corpus of thousands of layers.
+    """
+
+    message = "event {event_id} has {field}={value!r}, which is not RFC 3339"
+
+
 class EventIdMismatchError(ServiceError):
     message = "event_id mismatch: supplied '{supplied}' != canonical '{canonical}'"
 
 
 __all__ = [
     "AuthError",
+    "CorruptStoredEventError",
     "DecisionVerdictConflictError",
     "EventIdMismatchError",
     "IdentityRequiredError",

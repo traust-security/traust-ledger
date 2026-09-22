@@ -79,6 +79,59 @@ _CWE_NUMBER_RE = re.compile(r"(\d+)")
 _CWE_NO_NUMBER = 10**9
 
 
+def _cwe_list(finding: dict) -> list[str]:
+    """`cwes` is the code-audit shape; cloud-config findings carry `cwe`."""
+    single = finding.get("cwe")
+    return [single] if isinstance(single, str) and single else []
+
+
+def policy_check(finding: dict) -> str:
+    """A policy-scan finding's check id, or "" when it has none.
+
+    IaC findings are separated by the CHECK, not by path and CWE. Measured
+    2026-09-18 across 2,592 cloud-config findings: anchoring on resource and
+    CWE alone gave 1,565 identities for 2,592 findings -- 53.9% sharing an
+    identity, so 20 distinct policy violations on one Pod (privileged
+    container, missing limits, host network, ...) all collapsed to a single
+    value and a disposition on one silently covered the other nineteen.
+    That is the same failure `strict` mode exists to prevent, at the same
+    scale (369/1,396 here against 433/1,397 then).
+
+    With the check appended: 2,564 identities, 56 findings sharing one -- and
+    all 28 of those groups have IDENTICAL titles, i.e. the same check on the
+    same resource split across file sets by the scanner. Collapsing those is
+    correct; they are one finding expressed twice.
+
+    APPENDED ONLY WHEN PRESENT, which is what keeps ALGO_VERSION still. No
+    code-audit finding carries `check_id`, so every stamped input keeps its
+    exact payload. Making it an unconditional empty component instead would
+    add a trailing separator to all 120,225 existing stamps and force a v4.
+    """
+    value = finding.get("check_id")
+    return ascii_upper(value.strip()) if isinstance(value, str) else ""
+
+
+def location_anchor(location: dict) -> str:
+    """The identity anchor for one location: `path`, else `resource`.
+
+    Code findings carry `locations[].path`. Cloud-config findings carry
+    `file_path`, `resource` and `file_line_range` instead -- a different
+    shape, so 2,592 corpus findings were unfingerprintable and their
+    dispositions could not survive a re-audit.
+
+    `resource` rather than `file_path`, deliberately:
+    `RoleBinding.ns.name` survives the IaC file being moved, split or
+    renamed, which is routine. The file path does not.
+
+    This WIDENS the recipe's domain and does not touch ALGO_VERSION -- the
+    same argument `strict` mode makes in reverse. Verified across 122,836
+    corpus findings: 0 carry both `path` and `resource`-only locations, and
+    0 findings with a `resource` anchor were already stamped, so no
+    accepted input changes value.
+    """
+    return canon_path(location.get("path")) or canon_path(location.get("resource"))
+
+
 def primary_cwe(finding: dict) -> str:
     r"""Lowest CWE **by number**, ASCII-uppercased and stripped; 'CWE-0' when absent.
 
@@ -107,7 +160,7 @@ def primary_cwe(finding: dict) -> str:
     schema-valid report (minItems 1, ^CWE-\d{1,5}$) and fully reachable for the
     non-harness producers the SDK exists to serve.
     """
-    cwes = [c for c in (finding.get("cwes") or []) if str(c).strip()]
+    cwes = [c for c in (finding.get("cwes") or _cwe_list(finding)) if str(c).strip()]
     if not cwes:
         return "CWE-0"
 
@@ -161,7 +214,7 @@ def fingerprint(finding: dict, repo_url: str | None, *, strict: bool = False) ->
             # Filter AFTER canonicalizing, not before: v1 tested the raw value
             # for truthiness, so a path of "." survived the check and then
             # canonicalized to "", putting an empty component in the join.
-            if (canon := canon_path(loc.get("path")))
+            if (canon := location_anchor(loc))
         }
     )
     if strict and not paths:
@@ -173,5 +226,128 @@ def fingerprint(finding: dict, repo_url: str | None, *, strict: bool = False) ->
             "pseudo-path from traust-contracts enums/v1/repo-scope-path.json "
             "when it genuinely concerns no artifact."
         )
-    payload = "|".join([canon_repo(repo_url), ";".join(paths), primary_cwe(finding)])
+    components = [canon_repo(repo_url), ";".join(paths), primary_cwe(finding)]
+    if check := policy_check(finding):
+        components.append(check)
+    payload = "|".join(components)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# Attribution — which historical recipe minted an existing stamp
+# ---------------------------------------------------------------------------
+#
+# Stamps written before 2026-09-18 carry no fingerprint_algo, so nothing on
+# disk says which recipe produced them. That was answerable only by trying
+# every recipe against every finding, which works while the set of
+# candidates is small and stops working the moment it is not.
+#
+# This makes the trying explicit and bounded. The set is CLOSED: every stamp
+# written from now on self-declares its version, so the ladder only ever has
+# to cover history, and history does not grow.
+#
+# Measured across the corpus 2026-09-18 (25,515 report stamps):
+#   v3  21,478 (84.2%)   v2  3,909 (15.3%)   v1  56 (0.2%)
+#   + 72 minted from an un-normalized repository string, which is a property
+#     of the INPUT rather than of the recipe -- see repo_candidates below.
+#   unattributed: 0
+
+
+def _paths_v1(finding: dict) -> list[str]:
+    """v1 tested the RAW path for truthiness, so '.' survived and canonicalized
+    to '', putting an empty component in the join."""
+    return sorted({canon_path(loc.get("path")) for loc in (finding.get("locations") or [])})
+
+
+def _paths_v3(finding: dict) -> list[str]:
+    """The CURRENT recipe's path set. Must stay identical to fingerprint().
+
+    Sharing a helper with the v2 rung was a bug: widening the live recipe to
+    anchor on `resource` silently widened v2 too, and then narrowing v2 back
+    to match history silently narrowed v3, so attribution returned None for
+    stamps the current recipe had just minted. The newest rung tracks the
+    live recipe; every older rung is frozen.
+    """
+    return sorted(
+        {canon for loc in (finding.get("locations") or []) if (canon := location_anchor(loc))}
+    )
+
+
+def _cwe_current(finding: dict) -> str:
+    """The current recipe's third component: CWE, plus the check when present.
+
+    The ladder rungs are (paths, cwe) pairs, so the conditional fourth
+    component rides here rather than changing the tuple shape for every
+    frozen rung. Frozen rungs must NOT call this.
+    """
+    cwe = primary_cwe(finding)
+    return f"{cwe}|{check}" if (check := policy_check(finding)) else cwe
+
+
+def _paths_v2(finding: dict) -> list[str]:
+    """v2 read `path` only. The ladder must reproduce history EXACTLY, so it
+    does NOT get the `resource` alias -- a rung that reads an input the
+    historical recipe could not see would attribute a stamp to a version
+    that provably did not mint it."""
+    return sorted(
+        {
+            canon
+            for loc in (finding.get("locations") or [])
+            if (canon := canon_path(loc.get("path")))
+        }
+    )
+
+
+def _cwe_first(finding: dict) -> str:
+    """v1/v2 took cwes[0] -- identity depended on the order a model wrote.
+
+    No `cwe` alias here either: same reason as _paths_v2."""
+    values = [c for c in (finding.get("cwes") or []) if c]
+    return ascii_upper(values[0].strip()) if values else "CWE-0"
+
+
+#: Newest first, so attribution reports the most recent recipe that matches.
+#: Keep this ordered: a stamp that two recipes both produce is attributed to
+#: the newer one, which is the safer read when they collide.
+ALGO_LADDER: tuple[tuple[str, object, object], ...] = (
+    ("v3", _paths_v3, _cwe_current),
+    ("v2", _paths_v2, _cwe_first),
+    ("v1", _paths_v1, _cwe_first),
+)
+
+
+def _hash(repo_url: str | None, paths: list[str], cwe: str) -> str:
+    import hashlib
+
+    return hashlib.sha256(
+        "|".join([canon_repo(repo_url), ";".join(paths), cwe]).encode("utf-8")
+    ).hexdigest()
+
+
+def attribute(
+    finding: dict, stamp: str, repo_candidates: list[str | None] | tuple[str | None, ...]
+) -> str | None:
+    """Which recipe version produced `stamp`, or None if no known one did.
+
+    `repo_candidates` exists because the repository string itself has a
+    history: 72 corpus stamps were minted from a value like
+    `<https://host/org/repo>` before normalize_repository stripped the
+    autolink brackets. That is an INPUT state, not a recipe version, so it
+    multiplies the candidates rather than adding a rung to the ladder.
+    Pass every plausible spelling; the first that reproduces wins.
+
+    Returns the ALGO version only. A caller that needs to know WHICH repo
+    string matched should re-run the winning rung itself -- attribution
+    answers "is this stamp accounted for", not "reconstruct the inputs".
+    """
+    # No early return for an empty stamp: no digest equals "", so the loop
+    # already yields None. A guard here would be untestable by construction.
+    seen: list[str | None] = []
+    for candidate in repo_candidates:
+        if candidate in seen:
+            continue
+        seen.append(candidate)
+        for version, paths_of, cwe_of in ALGO_LADDER:
+            if _hash(candidate, paths_of(finding), cwe_of(finding)) == stamp:
+                return version
+    return None

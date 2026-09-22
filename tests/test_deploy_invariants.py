@@ -541,6 +541,32 @@ def test_no_signing_key_in_image() -> None:
     assert embedded_env_keys == []
 
 
+def test_builder_and_runtime_python_minors_match() -> None:
+    """The builder's .venv is copied into the runtime stage verbatim.
+
+    Native-extension .so files are ABI-pinned per Python minor and the venv's
+    console-script shebangs hardcode the builder's interpreter path, so a
+    minor skew yields missing native modules and an unusable entrypoint —
+    invisible until the image actually runs in a cluster.
+    """
+    containerfile = _require_containerfile()
+    instructions = _containerfile_instructions(containerfile.read_text(encoding="utf-8"))
+
+    from_lines = [line for line in instructions if _instruction_starts_with(line, "FROM")]
+    minors = {
+        stage: match.group(1)
+        for stage, line in ((line.split()[-1], line) for line in from_lines)
+        if (match := re.search(r"/python:(\d+\.\d+)", line))
+    }
+
+    assert "builder" in minors, f"no python builder stage found in {from_lines}"
+    assert "runtime" in minors, f"no python runtime stage found in {from_lines}"
+    assert minors["builder"] == minors["runtime"], (
+        f"builder python {minors['builder']} != runtime python {minors['runtime']}; "
+        "the copied .venv would be ABI-mismatched"
+    )
+
+
 def test_cosign_present_in_image() -> None:
     """Container image must ship cosign for signature verification."""
     containerfile = _require_containerfile()

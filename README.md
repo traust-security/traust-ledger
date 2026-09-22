@@ -85,11 +85,11 @@ Consumers pin both:
 
 ```toml
 [project]
-dependencies = ["traust-ledger>=0.20.0", "traust-contracts>=1.2.0,<2"]
+dependencies = ["traust-ledger>=0.2.1", "traust-contracts>=0.3.0"]
 
 [tool.uv.sources]
-traust-ledger = { git = "ssh://git@<your-forge>/<namespace>/traust-ledger.git", tag = "v0.20.0" }
-traust-contracts = { git = "ssh://git@<your-forge>/<namespace>/traust-contracts.git", tag = "v1.2.0" }
+traust-ledger = { git = "ssh://git@<your-forge>/<namespace>/traust-ledger.git", tag = "v0.2.1" }
+traust-contracts = { git = "ssh://git@<your-forge>/<namespace>/traust-contracts.git", tag = "v0.3.0" }
 ```
 
 The authoritative pins for this repo are in its own `pyproject.toml` — if the block above

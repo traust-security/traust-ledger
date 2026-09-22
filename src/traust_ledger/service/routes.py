@@ -14,6 +14,7 @@ from traust_ledger.handlers.fingerprint_handler import compute_fingerprints
 from traust_ledger.handlers.layer_handler import load_layer
 from traust_ledger.handlers.resolve_handler import resolve_review_item
 from traust_ledger.handlers.sign_handler import sign_layer
+from traust_ledger.handlers.stamp_handler import stamp_event_identities
 from traust_ledger.handlers.submit_handler import submit_batch
 from traust_ledger.handlers.verify_handler import verify_layer
 from traust_ledger.models import (
@@ -26,6 +27,8 @@ from traust_ledger.models import (
     FingerprintResponse,
     LayerListResponse,
     ResolveResponse,
+    StampRequest,
+    StampResponse,
     SubmitResponse,
     VerifyResponse,
 )
@@ -293,3 +296,41 @@ async def sign_layer_endpoint(
     result = sign_layer(layer, config, rekor=rekor)
     backend.store(path, layer)
     return {**result, "layer_id": layer_id}
+
+
+@router.post(
+    "/v1/ledger/layers/{layer_id}/stamp",
+    response_model=StampResponse,
+    dependencies=[Depends(require_identity)],
+    responses={
+        401: {"model": ErrorDetail, "description": "Missing or invalid authentication credentials"},
+        404: {"model": ErrorDetail, "description": "Layer not found"},
+        500: {"model": ErrorDetail, "description": "Signing failed"},
+    },
+)
+async def stamp_layer_endpoint(
+    layer_id: str,
+    body: StampRequest,
+    request: Request,
+) -> StampResponse:
+    config = _config(request)
+    backend = request.app.state.backend
+    path = layer_file_path(config.data_dir, layer_id)
+    layer = backend.load(path)
+    result = stamp_event_identities(layer, body.fingerprints, config, layer_id=layer_id)
+    backend.store(path, layer)
+    return StampResponse(**result)
+
+
+@router.get(
+    "/v1/ledger/whoami",
+    response_model=LayerActor,
+    responses={
+        401: {"model": ErrorDetail, "description": "Missing or invalid authentication credentials"},
+    },
+    summary="Return the token-verified actor for the caller",
+)
+async def whoami_endpoint(
+    actor: Annotated[LayerActor, Depends(resolve_actor)],
+) -> LayerActor:
+    return actor

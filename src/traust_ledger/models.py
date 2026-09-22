@@ -83,3 +83,13 @@ class FingerprintResponse(BaseModel):
 
 class LayerListResponse(BaseModel):
     layers: list[str]
+
+
+class StampRequest(BaseModel):
+    fingerprints: dict[str, str]
+
+
+class StampResponse(BaseModel):
+    merkle_root: str | None = None
+    layer_id: str
+    stamped: int

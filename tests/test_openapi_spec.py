@@ -20,14 +20,21 @@ from traust_ledger.service.route_constants import (
 SCHEMA_EVENT_ENVELOPE = "EventEnvelope"
 SCHEMA_SUBMIT_RESPONSE = "SubmitResponse"
 SCHEMA_HEALTH_RESPONSE = "HealthResponse"
+SCHEMA_STAMP_REQUEST = "StampRequest"
+SCHEMA_STAMP_RESPONSE = "StampResponse"
 
 EXPECTED_COMPONENT_SCHEMAS = (
     SCHEMA_EVENT_ENVELOPE,
     SCHEMA_SUBMIT_RESPONSE,
     SCHEMA_HEALTH_RESPONSE,
+    SCHEMA_STAMP_REQUEST,
+    SCHEMA_STAMP_RESPONSE,
 )
 
-POST_ROUTES = (ROUTE_EVENTS,)
+ROUTE_LAYER_STAMP = "/v1/ledger/layers/{layer_id}/stamp"
+ROUTE_WHOAMI = "/v1/ledger/whoami"
+
+POST_ROUTES = (ROUTE_EVENTS, ROUTE_LAYER_STAMP)
 
 ROUTE_LAYER_VERIFY = "/v1/ledger/layers/{layer_id}/verify"
 ROUTE_LAYER_FINDINGS = "/v1/ledger/layers/{layer_id}/findings"
@@ -41,6 +48,7 @@ EXPECTED_GET_ROUTES = (
     ROUTE_LAYER_FINDINGS,
     ROUTE_LAYER_EVENTS,
     ROUTE_BULK_FINDINGS,
+    ROUTE_WHOAMI,
 )
 
 COMMITTED_SPEC_PATH = Path(__file__).resolve().parent.parent / "docs" / "openapi.json"
