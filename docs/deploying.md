@@ -13,10 +13,11 @@ seams are documented in [`auth.md`](auth.md) and [`service-identity.md`](service
 
 ## Storage backend
 
-`Backend` protocol (`traust_ledger.backends`): `FileBackend` (default, zero deps, JSON on
-disk) or `DbBackend` (SQLAlchemy, any dialect URL). Selected by `LAAS_BACKEND_TYPE=file|db`
-+ `LAAS_DATABASE_URL`; wired in `create_backend()` (`backends/__init__.py`). Proposed
-normalized schema for `db` at scale: [`data-model.md`](data-model.md).
+The internal `Backend` protocol supports `FileBackend` (default, zero dependencies,
+JSON on disk) and `DbBackend` (SQLite or PostgreSQL through SQLAlchemy). Select it
+with `LAAS_BACKEND_TYPE=file|db` plus `LAAS_DATABASE_URL`. SQLite uses a dedicated
+Ledger file; PostgreSQL uses schema `traust_ledger`. The implemented revisioned
+schema and append-only guards are documented in [`data-model.md`](data-model.md).
 
 ## Container image
 
@@ -88,9 +89,9 @@ For dashboard-backing tables, the materialize CLI writes resolved findings into 
 SQLAlchemy-compatible database:
 
 ```bash
-python -m traust_ledger.cli.materialize --to sqlite:///findings.db
-python -m traust_ledger.cli.materialize --to postgresql://user:pass@host/db
-python -m traust_ledger.cli.materialize --ddl   # print schema DDL and exit
+ledger materialize --to sqlite:///findings.db
+LAAS_MATERIALIZE_URL=postgresql://user:pass@host/db ledger materialize
+ledger materialize --ddl   # print schema DDL and exit
 ```
 
 Rows are keyed on `(layer_id, finding_ref)` — re-running is idempotent (upsert).
@@ -111,8 +112,8 @@ ledger (any backend)
             └─ SQL views + indexes over THAT → dashboards
 ```
 
-The precedence engine lives in `traust_ledger.disposition` — shared by the service, the
-harness engine, and SCI.
+The precedence engine lives in `traust_ledger.api.disposition` — shared by the service,
+the harness engine, and SCI.
 
 **Not yet built:** A push/streaming materializer (change-feed driven). Pull-on-schedule
 covers every current consumer. Push requires change notification the service doesn't
@@ -133,10 +134,10 @@ SQLite is a valid backend for small/single-writer deployments. Be aware:
 - **`FOR UPDATE` is a no-op** — SQLite has no row-level locking. Concurrency
   correctness relies on database-level write serialization (WAL mode + `busy_timeout`,
   both configured automatically by `create_backend`).
-- The real upsert (`INSERT ... ON CONFLICT DO UPDATE`) eliminates the first-write race
-  for new layer IDs.
-- **Concurrency tests must run against Postgres.** The test suite exercises correctness,
-  not concurrent access.
+- SQLite serializes database writes; the backend still enforces suffix-only event
+  appends and installs update/delete/sequence-gap triggers.
+- **Concurrency tests must run against PostgreSQL.** Set `LEDGER_TEST_DATABASE_URL`;
+  `tests/test_storage_e2e.py` covers the file, SQLite, and PostgreSQL lifecycle.
 
 ### NFS `flock` caveat
 

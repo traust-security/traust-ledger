@@ -1,6 +1,6 @@
 [project]
 name = "traust-ledger"
-version = "0.6.32"
+version = "0.6.33"
 license = "Apache-2.0"
 description = "Disposition-ledger kernel: finding identity, event math, integrity (Merkle + signing), and the single ledger write path"
 requires-python = ">=3.11"
@@ -24,6 +24,7 @@ service = [
     "uvicorn[standard]>=0.30",
     "pydantic-settings>=2.0",
     "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.1",
 ]
 cli = ["httpx2"]
 

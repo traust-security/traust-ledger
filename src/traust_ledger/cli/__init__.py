@@ -41,7 +41,11 @@ def iter_layers(
     data_dir: str,
 ) -> Iterator[tuple[str, dict]]:
     """Yield (layer_id, layer_dict) for every layer in the backend."""
+    database_loader = getattr(backend, "load_layer_id", None)
     for layer_id in backend.list_layer_ids():
+        if callable(database_loader):
+            yield layer_id, database_loader(layer_id)
+            continue
         path = layer_file_path(data_dir, layer_id)
         layer = backend.load(Path(path) if isinstance(path, str) else path)
         yield layer_id, layer

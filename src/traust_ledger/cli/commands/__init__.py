@@ -5,6 +5,8 @@ import argparse
 from traust_ledger.cli.commands.countersign import cmd_countersign
 from traust_ledger.cli.commands.event import cmd_event
 from traust_ledger.cli.commands.fingerprint import cmd_fingerprint
+from traust_ledger.cli.commands.materialize import register_materialize_parser
+from traust_ledger.cli.commands.migrate import register_migrate_parser
 from traust_ledger.cli.commands.query import register_query_parser
 from traust_ledger.cli.commands.resolve import register_resolve_parser
 from traust_ledger.cli.commands.sign import register_sign_parser
@@ -48,6 +50,8 @@ def register_all_parsers(subparsers: argparse._SubParsersAction) -> None:
     """Register all command subparsers."""
     register_write_parsers(subparsers)
     register_query_parser(subparsers)
+    register_migrate_parser(subparsers)
+    register_materialize_parser(subparsers)
     register_verify_parser(subparsers)
     register_resolve_parser(subparsers)
     register_sign_parser(subparsers)

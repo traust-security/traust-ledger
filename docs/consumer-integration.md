@@ -9,15 +9,16 @@ preparing data before submission. No auth required; safe for library use.
 
 | Import path | Key exports |
 |---|---|
-| `traust_ledger.identity` | `fingerprint`, `canon_path`, `canon_repo`, `primary_cwe` |
-| `traust_ledger.events` | `compute_event_id`, `compute_claim_hash`, `attach_identity`, `findings_from_events` |
-| `traust_ledger.disposition` | `derive_disposition`, `is_actor_verified`, `event_class` |
-| `traust_ledger.reports` | `report_sha256`, `check_report_digest`, `check_artifact_digests` |
+| `traust_ledger.api.identity` | `fingerprint`, `canon_path`, `canon_repo`, `primary_cwe` |
+| `traust_ledger.api.events` | `compute_event_id`, `compute_claim_hash`, `attach_identity`, `findings_from_events` |
+| `traust_ledger.api.disposition` | `derive_disposition`, `is_actor_verified`, `event_class` |
+| `traust_ledger.api.reports` | `report_sha256`, `check_report_digest`, `check_artifact_digests` |
 
 These paths are stable across versions. `_internal/` may change freely.
 
-**Note:** `identity`, `events`, and `disposition` are SDK migration candidates —
-they may eventually move to `traust-sdk/contracts/`. Import paths will be shimmed.
+**Note:** `identity`, `events`, and `disposition` are SDK migration candidates.
+Portable schemas remain in `traust-contracts`; runtime APIs may move to
+`traust-sdk`. Import paths will be shimmed.
 
 ## Gated tier (state changes — OIDC required)
 
@@ -70,11 +71,58 @@ For services that run traust-ledger in the same environment:
 | `ledger submit <events.json>` | Submit events (same as REST batch) |
 | `ledger countersign <finding_ref>` | Two-person countersign |
 | `ledger fingerprint <report.json>` | Stamp fingerprints on a report |
-| `ledger materialize --to <url>` | Populate a queryable projection table |
+| `ledger migrate --source-dir <dir>` | Migrate trusted historical layer files |
+| `ledger migrate --source-database-url <url>` | Migrate complete layer artifact evidence |
+| `ledger migrate --source-ledger-database-url <url>` | Copy normalized SQLite/PostgreSQL Ledger state |
+| `ledger materialize --to <url>` | Rebuild the queryable findings projection |
 | `ledger query layers` | List layers |
 | `ledger query findings <layer>` | Resolved findings for a layer |
 | `ledger query events <layer>` | Event log for a layer |
 | `ledger query verify <layer>` | Merkle integrity check |
+
+### Historical migration
+
+Migration is an explicit administrative copy operation, never a startup conversion or
+normal event submission. It does not mutate or delete the source. Credentials belong in
+environment variables:
+
+```bash
+# Complete layer files from a Ledger data directory
+export LAAS_MIGRATION_TARGET_URL=postgresql://user:pass@host/database
+ledger migrate --source-dir /path/to/ledger-data --dry-run
+ledger migrate --source-dir /path/to/ledger-data
+
+# Complete evidence already stored by artifact migration
+export LAAS_MIGRATION_SOURCE_URL=postgresql://user:pass@host/database
+ledger migrate --source-database-url from-env
+
+# Copy a dedicated SQLite Ledger into PostgreSQL
+export LAAS_MIGRATION_SOURCE_URL=sqlite:////path/to/ledger.db
+ledger migrate --source-ledger-database-url from-env
+
+# Resume or inspect one layer
+ledger migrate --source-dir /path/to/ledger-data --layer layer-a --json
+```
+
+`--source-database-url from-env` selects database evidence while the real URL
+comes from `LAAS_MIGRATION_SOURCE_URL`; `LAAS_MIGRATION_TARGET_URL` always names
+the normalized Ledger destination. Migration validates complete layer documents,
+preserves event array order, reconstructs after insertion, skips exact reruns,
+and reports differing existing history as a conflict. Set
+`LAAS_MIGRATION_SIGNATURE_KEY` to verify stored signatures; without it, signed
+layers migrate with an explicit validation warning rather than a false claim of
+signature verification.
+
+For PostgreSQL, deployment-owned roles can be configured during migration with
+`--writer-role`, `--projector-role`, and `--reader-role` (or their
+`LAAS_MIGRATION_*_ROLE` environment variables). The roles must already exist and
+must be distinct. Migration resets their Ledger-table grants to this matrix:
+
+| Role | Authoritative tables | Projection |
+|---|---|---|
+| writer | `SELECT/INSERT` events; `SELECT/INSERT/UPDATE` layers | none |
+| projector | `SELECT` layers/events | full rebuild access |
+| reader | none | `SELECT` only |
 
 ### Materialization
 
@@ -99,8 +147,11 @@ ledger materialize --to sqlite:///findings.db --layer repo-a --layer repo-b
 ledger materialize --ddl
 ```
 
-The projection table (`materialized_findings`) is keyed on `(layer_id, finding_ref)`.
-Re-running is idempotent. Each layer commits independently.
+The projection table is keyed on `(layer_id, finding_ref)`. PostgreSQL exposes
+it as `traust_ledger.materialized_findings`; SQLite uses the unqualified table
+name. Re-running is idempotent. Each layer commits independently. To migrate and
+materialize into one PostgreSQL database, set `LAAS_DATABASE_URL` and
+`LAAS_MATERIALIZE_URL` to that same URL after migration.
 
 ### Layer ID derivation
 
@@ -117,6 +168,7 @@ traust-ledger provides (via LedgerClient/CLI/REST):
   ✓ disposition resolution (per-layer findings)
   ✓ integrity verification (merkle tree, signatures)
   ✓ fingerprint stamping (deterministic identity recipe)
+  ✓ historical migration from complete trusted evidence
   ✓ materialized projection (queryable SQL table)
   ✓ queue management (needs_review lifecycle)
 
@@ -125,5 +177,5 @@ traust-ledger does NOT provide:
   ✗ cross-layer joins or aggregation
   ✗ dashboard queries or scoring
   ✗ deployment topology awareness
-  ✗ additional schema beyond materialized_findings
+  ✗ contracts-owned cross-schema views or application dashboard schemas
 ```

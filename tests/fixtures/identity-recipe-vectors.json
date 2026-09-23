@@ -10,7 +10,7 @@
     "primary_cwe": "first of finding.cwes upper()+strip(); 'CWE-0' when absent/empty",
     "locations": "deduped set of canon paths, sorted, ';'-joined"
   },
-  "source": "traust_ledger.identity",
+  "source": "traust_ledger.api.identity",
   "note": "Regression fixtures for the canonical recipe, ported into this repo on 2026-08-18 from the retired traust-contracts golden-vector suite (plan decision D7: only the harness computes identity, so no second-language port needs a shared oracle). These are NOT a cross-language contract \u2014 they are this implementation's regression net, which D7 explicitly says not to lose. Regenerate with scripts/gen_identity_recipe_vectors.py; v1_expected_fingerprint keeps a recipe move visible rather than silently re-baselined.",
   "vectors": [
     {

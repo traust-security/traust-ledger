@@ -2,6 +2,52 @@
 
 All notable changes to traust-ledger are documented here.
 
+## [0.6.33]
+
+### Changed
+
+- Replaced the legacy complete-layer database blob with Ledger-owned,
+  revisioned `layers`, ordered `events`, `materialized_findings`, and
+  `schema_revision` tables. PostgreSQL objects live under `traust_ledger`;
+  SQLite uses a dedicated configured Ledger database.
+- Renamed the administrative `ledger replay` operation to `ledger migrate`.
+  Environment variables are now `LAAS_MIGRATION_SOURCE_URL` and
+  `LAAS_MIGRATION_TARGET_URL`.
+- Refactored normalized persistence around typed `LayerRecord`, `EventRecord`,
+  and `StoredLayerRecord` boundaries. Canonical binary JSON remains the exact
+  reconstruction payload and preserves strings containing U+0000.
+
+### Integrity
+
+- Database event history is physically append-only. Persistence accepts only
+  an exact existing prefix plus a new suffix; PostgreSQL and SQLite reject
+  event updates, deletes, missing IDs, and sequence gaps. PostgreSQL also
+  rejects truncation. Layer deletion is prohibited.
+- Added schema revision 2 and an explicit revision 1 to 2 upgrade.
+- Added distinct configurable PostgreSQL writer, projector, and reader grants.
+  The application role no longer needs schema-owner privileges after setup.
+- Historical migration validates contracts and Merkle roots, reconstructs
+  every inserted layer before commit, skips exact reruns, and quarantines
+  malformed or conflicting source evidence. Signature verification is
+  available through `LAAS_MIGRATION_SIGNATURE_KEY`; absent trusted key
+  material is reported as an explicit warning.
+
+### Verification
+
+- Added storage lifecycle E2E coverage for the file backend, SQLite, and
+  PostgreSQL, plus file-to-SQLite migration and findings materialization.
+- Rehearsed the PostgreSQL migration against 8,236 real layers containing
+  81,433 events and 17,951 review items. A second run skipped every layer;
+  materialization produced 57,241 findings.
+
+### Upgrading
+
+- Replace `ledger replay` with `ledger migrate` and rename any `LAAS_REPLAY_*`
+  environment variables to `LAAS_MIGRATION_*`.
+- Run migration/schema setup using an owner or migration role before starting
+  a least-privilege writer or projector. Existing revision-1 databases upgrade
+  to revision 2 through Ledger's authored migration.
+
 ## [0.3.0]
 
 ## Changes

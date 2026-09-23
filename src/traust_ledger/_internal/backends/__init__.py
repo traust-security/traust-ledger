@@ -45,6 +45,8 @@ def create_backend(backend_type: str = BACKEND_TYPE_FILE, **kwargs: object) -> B
     if backend_type == BACKEND_TYPE_DB:
         from sqlalchemy import create_engine, event
 
+        from traust_ledger._internal.migrations import ensure_current
+
         from .db import DbBackend
 
         database_url = kwargs.get("database_url")
@@ -60,7 +62,7 @@ def create_backend(backend_type: str = BACKEND_TYPE_FILE, **kwargs: object) -> B
                 cursor.execute("PRAGMA busy_timeout=5000")
                 cursor.close()
 
-        DbBackend.create_tables(engine)
+        ensure_current(engine)
         return DbBackend(engine)
     raise ValueError(UNKNOWN_BACKEND_MSG.format(backend_type=backend_type))
 

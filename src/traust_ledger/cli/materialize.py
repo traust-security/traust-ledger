@@ -39,10 +39,7 @@ def _redact(url: str) -> str:
     return re.sub(r"://[^/@]*:[^/@]*@", "://***:***@", url)
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Materialize resolved findings into a queryable store",
-    )
+def _configure_parser(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--to",
         help="SQLAlchemy URL for the target store (e.g. sqlite:///findings.db). "
@@ -73,15 +70,22 @@ def main(argv: list[str] | None = None) -> int:
         metavar="ID",
         help="Materialize only this layer ID (repeatable)",
     )
-    args = parser.parse_args(argv)
 
+
+def register_materialize_parser(subparsers: argparse._SubParsersAction) -> None:
+    parser = subparsers.add_parser("materialize", help="Rebuild the queryable findings projection")
+    _configure_parser(parser)
+    parser.set_defaults(handler=cmd_materialize)
+
+
+def cmd_materialize(args: argparse.Namespace) -> int:
     if args.ddl:
         print_ddl()
         return 0
 
     target_url = os.environ.get("LAAS_MATERIALIZE_URL") or args.to
     if not target_url:
-        parser.error(
+        raise SystemExit(
             "a target is required unless --ddl is specified: pass --to for a local "
             "sqlite path, or set LAAS_MATERIALIZE_URL for anything with credentials"
         )
@@ -148,6 +152,14 @@ def main(argv: list[str] | None = None) -> int:
         )
     )
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Materialize resolved findings into a queryable store",
+    )
+    _configure_parser(parser)
+    return cmd_materialize(parser.parse_args(argv))
 
 
 if __name__ == "__main__":

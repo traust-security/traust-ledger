@@ -83,7 +83,7 @@ def _layer_with_events(event: dict) -> dict:
 def test_atomic_append(backend: Backend, tmp_path: Path) -> None:
     """Stored layer content matches what was written."""
     layer_path = tmp_path / "layer.json"
-    layer = _layer_with_events(_sample_append_event())
+    layer = _layer_with_events({**_sample_append_event(), "event_id": SAMPLE_EVENT_ID})
     backend.store(layer_path, layer)
     loaded = backend.load(layer_path)
     assert loaded == layer
@@ -168,13 +168,8 @@ def test_round_trip_fidelity(backend: Backend, tmp_path: Path) -> None:
     assert second_load == first_load == payload
 
 
-def test_list_layer_ids_round_trips_through_layer_file_path_for_both_backends(tmp_path):
-    """The contract `iter_layers()` depends on: whatever `list_layer_ids()` returns
-    must be a valid layer_id, because it is fed straight back to `layer_file_path()`.
-    The db backend keyed on `str(path)` and returned filesystem paths, so every CLI
-    over `LAAS_BACKEND_TYPE=db` raised "layer_id contains invalid characters" on the
-    first layer. Pinned for both backends so the two key spaces cannot drift again.
-    """
+def test_iter_layers_supports_file_and_database_identity_spaces(tmp_path):
+    """File IDs obey path rules; database IDs remain opaque domain identities."""
     from sqlalchemy import create_engine
 
     from traust_ledger._internal.backends.db import DbBackend
@@ -192,7 +187,12 @@ def test_list_layer_ids_round_trips_through_layer_file_path_for_both_backends(tm
         backend.store(layer_file_path(str(data_dir), "repo-a"), layer)
         assert backend.list_layer_ids() == ["repo-a"], type(backend).__name__
         for layer_id, _ in iter_layers(backend, str(data_dir)):
-            layer_file_path(str(data_dir), layer_id)  # must not raise
+            layer_file_path(str(data_dir), layer_id)  # file-compatible ID must not raise
+
+    opaque_id = "corpus:layer:org/repo__main/repo__main"
+    db_backend = DbBackend(engine)
+    db_backend.import_layer(opaque_id, layer)
+    assert list(iter_layers(db_backend, str(data_dir))) == [(opaque_id, layer), ("repo-a", layer)]
 
 
 # ── Atomic mutate conformance ────────────────────────────────────────────

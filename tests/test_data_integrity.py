@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
+import os
 import re
+import uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier
 from unittest.mock import MagicMock
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import DBAPIError
 
 from traust_ledger._internal.backends.db import DbBackend
 from traust_ledger._internal.errors import EventIdMismatchError, IdentityUnverifiedError
+from traust_ledger._internal.migrations import DatabaseRoles, configure_roles
 from traust_ledger._internal.writer import LedgerWriter
 from traust_ledger.constants import (
     LAYER_ID_PATTERN,
@@ -43,6 +49,98 @@ class TestP18AtomicMutate:
         backend.mutate.assert_called_once()
         backend.load.assert_not_called()
         backend.store.assert_not_called()
+
+
+@pytest.mark.integration
+def test_postgres_concurrent_mutate_preserves_both_appends() -> None:
+    url = os.environ.get("LEDGER_TEST_DATABASE_URL")
+    if not url:
+        pytest.skip("LEDGER_TEST_DATABASE_URL is not configured")
+    engine = create_engine(url)
+    DbBackend.create_tables(engine)
+    backend = DbBackend(engine)
+    layer_id = f"concurrency-{uuid.uuid4().hex}"
+    layer_path = Path(layer_id)
+    barrier = Barrier(2)
+
+    def append(event_id: str) -> None:
+        barrier.wait()
+
+        def mutate(layer: dict) -> None:
+            layer.setdefault("events", []).append({"event_id": event_id})
+
+        backend.mutate(layer_path, mutate)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(append, ("event-a", "event-b")))
+    assert {event["event_id"] for event in backend.load(layer_path)["events"]} == {
+        "event-a",
+        "event-b",
+    }
+
+
+@pytest.mark.integration
+def test_postgres_guards_and_role_matrix() -> None:
+    url = os.environ.get("LEDGER_TEST_DATABASE_URL")
+    if not url:
+        pytest.skip("LEDGER_TEST_DATABASE_URL is not configured")
+    engine = create_engine(url)
+    DbBackend.create_tables(engine)
+    backend = DbBackend(engine)
+    layer_id = f"guard-{uuid.uuid4().hex}"
+    backend.import_layer(layer_id, {"metadata": {}, "events": [{"event_id": "event-a"}]})
+
+    for statement in (
+        "UPDATE traust_ledger.events SET event_id = 'changed' WHERE layer_id = :layer_id",
+        "DELETE FROM traust_ledger.events WHERE layer_id = :layer_id",
+        "DELETE FROM traust_ledger.layers WHERE layer_id = :layer_id",
+        "TRUNCATE traust_ledger.events",
+    ):
+        with pytest.raises(DBAPIError), engine.begin() as conn:
+            conn.execute(text(statement), {"layer_id": layer_id})
+
+    suffix = uuid.uuid4().hex
+    roles = DatabaseRoles(
+        writer=f"ledger_writer_{suffix}",
+        projector=f"ledger_projector_{suffix}",
+        reader=f"ledger_reader_{suffix}",
+    )
+    try:
+        with engine.begin() as conn:
+            for role in (roles.writer, roles.projector, roles.reader):
+                conn.execute(text(f'CREATE ROLE "{role}" NOLOGIN'))
+        configure_roles(engine, roles)
+        checks = {
+            "writer_insert_event": (roles.writer, "traust_ledger.events", "INSERT", True),
+            "writer_update_event": (roles.writer, "traust_ledger.events", "UPDATE", False),
+            "writer_delete_event": (roles.writer, "traust_ledger.events", "DELETE", False),
+            "projector_write_projection": (
+                roles.projector,
+                "traust_ledger.materialized_findings",
+                "UPDATE",
+                True,
+            ),
+            "projector_insert_event": (roles.projector, "traust_ledger.events", "INSERT", False),
+            "reader_read_projection": (
+                roles.reader,
+                "traust_ledger.materialized_findings",
+                "SELECT",
+                True,
+            ),
+            "reader_read_event": (roles.reader, "traust_ledger.events", "SELECT", False),
+        }
+        with engine.connect() as conn:
+            for name, (role, table, privilege, expected) in checks.items():
+                actual = conn.execute(
+                    text("SELECT has_table_privilege(:role, :table, :privilege)"),
+                    {"role": role, "table": table, "privilege": privilege},
+                ).scalar_one()
+                assert actual is expected, name
+    finally:
+        with engine.begin() as conn:
+            for role in (roles.writer, roles.projector, roles.reader):
+                conn.execute(text(f'DROP OWNED BY "{role}"'))
+                conn.execute(text(f'DROP ROLE "{role}"'))
 
 
 class TestLayerIdPattern:

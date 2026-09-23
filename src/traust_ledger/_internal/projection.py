@@ -1,59 +1,27 @@
-"""Materialized findings projection — schema and write operations.
-
-The projection table is the portable artifact downstream dashboards bind to.
-Schema is defined here; the CLI and any future builders import it.
-"""
+"""Ledger-owned materialized findings projection."""
 
 from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import (
-    Column,
-    DateTime,
-    Integer,
-    MetaData,
-    PrimaryKeyConstraint,
-    String,
-    Table,
-    delete,
-    insert,
-    select,
-    update,
-)
+from sqlalchemy import delete, insert, select, update
 from sqlalchemy.engine import Connection, Engine
-from sqlalchemy.sql import func
-from sqlalchemy.types import JSON, Boolean
 
+from traust_ledger._internal.migrations import ensure_current, ledger_tables
 from traust_ledger.models import FindingDisposition
 
-projection_metadata = MetaData()
+_sqlite_tables = ledger_tables("sqlite")
+projection_metadata = _sqlite_tables.metadata
+findings_table = _sqlite_tables.materialized_findings
 
-findings_table = Table(
-    "materialized_findings",
-    projection_metadata,
-    Column("layer_id", String, nullable=False),
-    Column("finding_ref", String, nullable=False),
-    Column("fingerprint", String, nullable=True),
-    Column("orphan", Boolean, nullable=True, default=False),
-    Column("validity", String, nullable=False),
-    Column("resolution", String, nullable=False),
-    Column("assurance", String),
-    Column("event_count", Integer, nullable=False),
-    Column("conflict", Boolean, default=False),
-    Column("fp_overridden", Boolean, default=False),
-    Column("fp_reassertion_blocked", Boolean, default=False),
-    Column("severity_override", JSON),
-    Column("last_updated", String),
-    Column("merkle_root", String),
-    Column("merkle_epoch", Integer),
-    Column("materialized_at", DateTime, server_default=func.now()),
-    PrimaryKeyConstraint("layer_id", "finding_ref"),
-)
+
+def _table(dialect_name: str):
+    return ledger_tables(dialect_name).materialized_findings
 
 
 def ensure_schema(engine: Engine) -> None:
-    projection_metadata.create_all(engine)
+    """Create the ledger schema and projection at the current revision."""
+    ensure_current(engine)
 
 
 def build_row(
@@ -67,8 +35,6 @@ def build_row(
     return {
         "layer_id": layer_id,
         "finding_ref": f.finding_ref,
-        # 6e: populated from the events, not synthesised. Both stay nullable —
-        # see FindingDisposition for why an unknown must not become a False.
         "fingerprint": f.fingerprint,
         "orphan": f.orphan,
         "validity": str(d.validity),
@@ -89,60 +55,42 @@ def build_row(
 def upsert_layer(
     conn: Connection, layer_id: str, rows: list[dict], *, prune_empty: bool = False
 ) -> None:
-    """Upsert findings for one layer: prune stale refs, insert or update current.
-
-    An EMPTY `rows` list does not prune by default. Previously it deleted every
-    row for the layer, so a layer that failed to parse, was momentarily empty, or
-    was skipped by a narrowed run silently erased its projection instead of
-    leaving the last good state — and the caller could not tell "this layer now
-    has no findings" apart from "this layer could not be read". Deleting a
-    layer's whole projection is a deliberate act; pass ``prune_empty=True`` to
-    ask for it.
-
-    A non-empty `rows` still prunes refs that are no longer present, which is
-    the case that keeps the projection honest after a re-baseline.
-    """
-    current_refs = {r["finding_ref"] for r in rows}
+    """Replace one layer's rebuildable finding projection transactionally."""
+    table = _table(conn.dialect.name)
+    current_refs = {row["finding_ref"] for row in rows}
     if not current_refs and not prune_empty:
         return
     conn.execute(
-        delete(findings_table).where(
-            findings_table.c.layer_id == layer_id,
-            ~findings_table.c.finding_ref.in_(current_refs)
+        delete(table).where(
+            table.c.layer_id == layer_id,
+            ~table.c.finding_ref.in_(current_refs)
             if current_refs
-            else findings_table.c.finding_ref.isnot(None),
+            else table.c.finding_ref.isnot(None),
         )
     )
     for row in rows:
         existing = conn.execute(
-            select(findings_table.c.finding_ref).where(
-                findings_table.c.layer_id == row["layer_id"],
-                findings_table.c.finding_ref == row["finding_ref"],
+            select(table.c.finding_ref).where(
+                table.c.layer_id == row["layer_id"],
+                table.c.finding_ref == row["finding_ref"],
             )
         ).first()
         if existing:
             conn.execute(
-                update(findings_table)
+                update(table)
                 .where(
-                    findings_table.c.layer_id == row["layer_id"],
-                    findings_table.c.finding_ref == row["finding_ref"],
+                    table.c.layer_id == row["layer_id"],
+                    table.c.finding_ref == row["finding_ref"],
                 )
                 .values(**row)
             )
         else:
-            conn.execute(insert(findings_table).values(**row))
+            conn.execute(insert(table).values(**row))
 
 
 def print_ddl() -> None:
-    """Print the projection table DDL (SQLite dialect) to stdout."""
-    from sqlalchemy import create_mock_engine
+    """Print portable SQLite DDL for the projection table."""
+    from sqlalchemy.dialects import sqlite
+    from sqlalchemy.schema import CreateTable
 
-    buf: list[str] = []
-
-    def dump(sql, *_args, **_kwargs):
-        compiled = sql.compile(dialect=engine.dialect)
-        buf.append(str(compiled).strip() + ";")
-
-    engine = create_mock_engine("sqlite://", dump)
-    projection_metadata.create_all(engine, checkfirst=False)
-    print("\n".join(buf))
+    print(str(CreateTable(findings_table).compile(dialect=sqlite.dialect())).strip() + ";")

@@ -30,7 +30,7 @@ All three converge on shared handlers (`traust_ledger.handlers`).
 | [`docs/service-identity.md`](docs/service-identity.md) | Pluggable authn providers (OIDC, API key), endpoint protection, testing with mock IdP |
 | [`docs/auth.md`](docs/auth.md) | Identity vs integrity split, Merkle-root signing |
 | [`docs/deploying.md`](docs/deploying.md) | Running the service, container image, Kubernetes manifests |
-| [`docs/data-model.md`](docs/data-model.md) | Proposed normalized DB schema for `DbBackend` at scale |
+| [`docs/data-model.md`](docs/data-model.md) | Revisioned normalized SQLite/PostgreSQL schema and integrity controls |
 
 ## Install
 
@@ -41,6 +41,12 @@ make setup    # uv sync + enable .githooks
 make test
 ```
 
+Install the `[service]` extra for SQLAlchemy/PostgreSQL storage and migration:
+
+```bash
+uv sync --extra service
+```
+
 ## Development
 
 ### Running tests
@@ -48,7 +54,7 @@ make test
 ```bash
 make test               # unit tests only (no Docker needed)
 make mock-idp           # start mock OIDC server (mockserver on :1080)
-make test-integration   # integration tests (requires mock-idp)
+make test-integration   # integration tests; PostgreSQL tests use LEDGER_TEST_DATABASE_URL
 make mock-idp-stop      # tear down mock server
 make coverage-all       # full coverage: starts mock-idp, runs all tests, stops it
 ```
@@ -85,17 +91,38 @@ Consumers pin both:
 
 ```toml
 [project]
-dependencies = ["traust-ledger>=0.2.1", "traust-contracts>=0.3.0"]
+dependencies = ["traust-ledger>=0.6.33", "traust-contracts>=0.35.0"]
 
 [tool.uv.sources]
-traust-ledger = { git = "ssh://git@<your-forge>/<namespace>/traust-ledger.git", tag = "v0.2.1" }
-traust-contracts = { git = "ssh://git@<your-forge>/<namespace>/traust-contracts.git", tag = "v0.3.0" }
+traust-ledger = { git = "ssh://git@<your-forge>/<namespace>/traust-ledger.git", tag = "v0.6.33" }
+traust-contracts = { git = "https://github.com/traust-security/traust-contracts.git", tag = "v0.35.0" }
 ```
 
 The authoritative pins for this repo are in its own `pyproject.toml` — if the block above
 disagrees with it, `pyproject.toml` wins and this README is stale.
 
 Local mono-checkout: point `[tool.uv.sources]` at a sibling path.
+
+## Storage and historical migration
+
+The file backend remains the zero-dependency default. SQLite uses a dedicated
+configured Ledger file; PostgreSQL uses the `traust_ledger` schema. Database
+events are physically append-only and layers reconstruct from ordered event
+payloads rather than a mutable complete-layer blob.
+
+Historical source-to-target copies use the explicit administrative command:
+
+```bash
+export LAAS_MIGRATION_SOURCE_URL=postgresql+psycopg://user:pass@host/source
+export LAAS_MIGRATION_TARGET_URL=postgresql+psycopg://user:pass@host/target
+ledger migrate --source-database-url from-env
+ledger materialize
+```
+
+Migration validates schema and Merkle integrity, preserves authored order,
+reconstructs after insertion, skips exact reruns, and rejects conflicts. See
+[`docs/consumer-integration.md`](docs/consumer-integration.md) for file, SQLite,
+PostgreSQL, signature-key, and role examples.
 
 ## Module reference
 

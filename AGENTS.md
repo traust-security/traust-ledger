@@ -18,11 +18,11 @@ matching, and preparing data before submission.
 
 | Module | Exports | SDK migration candidate |
 |--------|---------|------------------------|
-| `traust_ledger.identity` | `fingerprint`, `canon_path`, `canon_repo`, `primary_cwe`, `ALGO_VERSION` | Yes |
-| `traust_ledger.events` | `compute_event_id`, `compute_claim_hash`, `aliases_from_events`, `findings_from_events`, `attach_identity`, `make_alias_event` | Yes |
-| `traust_ledger.disposition` | `derive_disposition`, `is_actor_verified`, `event_class` | Yes |
-| `traust_ledger.integrity` | `verify_merkle_integrity`, `verify_merkle_signature`, `stamp_merkle_metadata`, `IntegrityFinding`, `Severity` | No |
-| `traust_ledger.reports` | `report_sha256`, `check_report_digest`, `check_artifact_digests` | No |
+| `traust_ledger.api.identity` | `fingerprint`, `canon_path`, `canon_repo`, `primary_cwe`, `ALGO_VERSION` | Yes |
+| `traust_ledger.api.events` | `compute_event_id`, `compute_claim_hash`, `aliases_from_events`, `findings_from_events`, `attach_identity`, `make_alias_event` | Yes |
+| `traust_ledger.api.disposition` | `derive_disposition`, `is_actor_verified`, `event_class` | Yes |
+| `traust_ledger.api.integrity` | `verify_merkle_integrity`, `verify_merkle_signature`, `stamp_merkle_metadata`, `IntegrityFinding`, `Severity` | No |
+| `traust_ledger.api.reports` | `report_sha256`, `check_report_digest`, `check_artifact_digests` | No |
 
 These are stable public paths. `_internal/` may refactor freely underneath.
 
@@ -46,13 +46,24 @@ identity onto the actor. `LedgerWriter` is internal and NOT importable.
 | `ledger resolve` | Resolve a needs_review item |
 | `ledger fingerprint` | Stamp identity on a report (in-place write) |
 | `ledger verify` | Merkle integrity check |
+| `ledger migrate` | Administratively copy validated historical layers into normalized storage |
 | `ledger materialize` | Populate SQL projection |
 | `ledger query` | findings / events / layers |
 
 ### Boundary rule
 
-If it **changes the ledger** → CLI/REST (OIDC enforced).
+If it **changes the ledger** → CLI/REST (OIDC enforced). Historical migration is
+a separate explicit administrative path; it never submits old events as new ones.
 If it **computes or reads** → importable from SDK-tier modules.
+
+### Database integrity rules
+
+- `events` is append-only: existing payloads must be an exact prefix; only suffix inserts.
+- Never add event `UPDATE`, `DELETE`, replacement, or truncation paths.
+- `layers` is the mutable current envelope but cannot be deleted.
+- `materialized_findings` is rebuildable and never integrity authority.
+- PostgreSQL changes require `LEDGER_TEST_DATABASE_URL` integration coverage.
+- File, SQLite, and PostgreSQL storage lifecycle changes require `tests/test_storage_e2e.py`.
 
 ## Three-entry-point symmetry
 

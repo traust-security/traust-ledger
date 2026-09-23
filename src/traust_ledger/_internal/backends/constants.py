@@ -6,9 +6,7 @@ BACKEND_TYPE_FILE = "file"
 BACKEND_TYPE_DB = "db"
 
 LAYERS_TABLE_NAME = "layers"
-LAYER_ID_COLUMN = "layer_id"
-DATA_COLUMN = "data"
-UPDATED_AT_COLUMN = "updated_at"
+EVENTS_TABLE_NAME = "events"
 
 DATABASE_URL_REQUIRED_MSG = "database_url is required for db backend"
 

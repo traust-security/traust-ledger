@@ -100,8 +100,8 @@ fingerprint" must say which.
 
 | | Field | Written by | Integrity |
 |---|---|---|---|
-| **wire** | `findings[].fingerprint` in `*-security-audit.json` | the audit skills, via `traust_ledger.identity.fingerprint` | **none in-band** — plain JSON in the artifact. The harness validator recomputes and compares, so a forged stamp is caught at validation, but the value itself sits in no tree |
-| **record** | event `fingerprint` + `fingerprint_algo` | `traust_ledger.events.attach_identity` | **yes** — under `leaf_format 2` the leaf is the whole event, so the stamp is inside the Merkle root. Editing it breaks the root |
+| **wire** | `findings[].fingerprint` in `*-security-audit.json` | the audit skills, via `traust_ledger.api.identity.fingerprint` | **none in-band** — plain JSON in the artifact. The harness validator recomputes and compares, so a forged stamp is caught at validation, but the value itself sits in no tree |
+| **record** | event `fingerprint` + `fingerprint_algo` | `traust_ledger.api.events.attach_identity` | **yes** — under `leaf_format 2` the leaf is the whole event, so the stamp is inside the Merkle root. Editing it breaks the root |
 
 **Computed once by the producer, read forever after.** `fingerprint_index` reads
 stamped values off the report; `attach_identity` copies one onto an event and

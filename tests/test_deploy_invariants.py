@@ -19,8 +19,13 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError
 
-from traust_ledger._internal.backends.constants import LAYER_EVENTS_KEY, LAYERS_TABLE_NAME
+from traust_ledger._internal.backends.constants import (
+    EVENTS_TABLE_NAME,
+    LAYER_EVENTS_KEY,
+    LAYERS_TABLE_NAME,
+)
 from traust_ledger._internal.backends.db import DbBackend
+from traust_ledger._internal.backends.errors import LayerConflictError
 from traust_ledger.config import ServiceConfig
 
 SERVICE_MODULE: Final = "traust_ledger.service"
@@ -392,12 +397,12 @@ def _attach_sql_capture(engine: Engine) -> list[str]:
     return statements
 
 
-def _delete_statements_on_layers(statements: Sequence[str]) -> list[str]:
-    table_name = LAYERS_TABLE_NAME.lower()
+def _delete_statements_on_table(statements: Sequence[str], table_name: str) -> list[str]:
     return [
         statement
         for statement in statements
-        if SQL_STATEMENT_DELETE in statement.upper() and table_name in statement.lower()
+        if SQL_STATEMENT_DELETE in statement.upper()
+        and f" {table_name.lower()} " in statement.lower()
     ]
 
 
@@ -576,23 +581,28 @@ def test_cosign_present_in_image() -> None:
     assert cosign_steps
 
 
-def test_insert_only_grants() -> None:
-    """Writer DB role must reject UPDATE and DELETE on event tables."""
+def test_authoritative_history_uses_suffix_only_appends() -> None:
+    """Existing events cannot be removed or rewritten during persistence."""
     engine = _memory_db_engine()
     statements = _attach_sql_capture(engine)
     backend = DbBackend(engine)
+    original = _layer_with_event_ids(EVENT_ID_ALPHA, EVENT_ID_BETA)
+    backend.store(TEST_LAYER_PATH, original)
 
-    backend.store(TEST_LAYER_PATH, _layer_with_event_ids(EVENT_ID_ALPHA, EVENT_ID_BETA))
-    backend.store(TEST_LAYER_PATH, _layer_with_event_ids(EVENT_ID_ALPHA))
+    with pytest.raises(LayerConflictError, match="cannot remove"):
+        backend.store(TEST_LAYER_PATH, _layer_with_event_ids(EVENT_ID_ALPHA))
+    with pytest.raises(LayerConflictError, match="cannot rewrite"):
+        backend.store(TEST_LAYER_PATH, _layer_with_event_ids(EVENT_ID_ALPHA, EVENT_ID_GAMMA))
 
     def append_gamma(layer: dict[str, list[dict[str, str]]]) -> None:
         layer[LAYER_EVENTS_KEY].append(_sample_event(EVENT_ID_GAMMA))
 
     backend.mutate(TEST_LAYER_PATH, append_gamma)
 
-    assert _delete_statements_on_layers(statements) == []
+    assert _delete_statements_on_table(statements, EVENTS_TABLE_NAME) == []
+    assert _delete_statements_on_table(statements, LAYERS_TABLE_NAME) == []
     assert any(
-        SQL_STATEMENT_INSERT in statement.upper() and LAYERS_TABLE_NAME in statement.lower()
+        SQL_STATEMENT_INSERT in statement.upper() and EVENTS_TABLE_NAME in statement.lower()
         for statement in statements
     )
     assert any(
@@ -602,7 +612,7 @@ def test_insert_only_grants() -> None:
 
     loaded = backend.load(TEST_LAYER_PATH)
     event_ids = [event["event_id"] for event in loaded[LAYER_EVENTS_KEY]]
-    assert event_ids == [EVENT_ID_ALPHA, EVENT_ID_GAMMA]
+    assert event_ids == [EVENT_ID_ALPHA, EVENT_ID_BETA, EVENT_ID_GAMMA]
 
 
 def test_no_sci_api_write_path(tmp_path: Path) -> None:
@@ -617,7 +627,10 @@ def test_no_sci_api_write_path(tmp_path: Path) -> None:
     reader = DbBackend(reader_engine)
 
     with pytest.raises(OperationalError):
-        reader.store(TEST_LAYER_PATH, _layer_with_event_ids(EVENT_ID_BETA))
+        reader.store(
+            TEST_LAYER_PATH,
+            _layer_with_event_ids(EVENT_ID_ALPHA, EVENT_ID_BETA),
+        )
 
     unchanged = writer.load(TEST_LAYER_PATH)
     assert [event["event_id"] for event in unchanged[LAYER_EVENTS_KEY]] == [EVENT_ID_ALPHA]
