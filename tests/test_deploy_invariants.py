@@ -100,7 +100,7 @@ ENV_PEM_PRIVATE_KEY_MARKER: Final = "PRIVATE KEY"
 
 SQLITE_MEMORY_URL: Final = "sqlite:///:memory:"
 SQLITE_FILE_URI_TEMPLATE: Final = "sqlite:///{path}"
-SQLITE_READ_ONLY_URI_TEMPLATE: Final = "sqlite:///{path}?mode=ro&uri=true"
+SQLITE_READ_ONLY_URI_TEMPLATE: Final = "sqlite:///file:{path}?mode=ro&uri=true"
 DB_FILENAME: Final = "ledger.db"
 
 TEST_LAYER_ID: Final = "deploy-invariant-layer"

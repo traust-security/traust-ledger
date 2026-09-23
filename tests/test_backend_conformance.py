@@ -54,9 +54,8 @@ def backend(request: pytest.FixtureRequest) -> Backend:
     """Yield a Backend instance for each registered backend type."""
     if request.param == BACKEND_PARAM_DB:
         engine = create_engine("sqlite:///:memory:")
-        db_backend = DbBackend(engine)
         DbBackend.create_tables(engine)
-        return db_backend
+        return DbBackend(engine)
     return create_backend(str(request.param))
 
 

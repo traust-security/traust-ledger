@@ -24,8 +24,8 @@ class TestP18AtomicMutate:
 
     def test_mutate_layer_delegates_to_backend_mutate(self, tmp_path: Path) -> None:
         engine = create_engine("sqlite:///:memory:")
-        backend = DbBackend(engine)
         DbBackend.create_tables(engine)
+        backend = DbBackend(engine)
         writer = LedgerWriter(backend=backend)
         layer_path = tmp_path / "layer.json"
 
