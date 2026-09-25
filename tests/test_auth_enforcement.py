@@ -45,7 +45,11 @@ def oidc_client(tmp_path, httpserver: HTTPServer, jwks_json) -> TestClient:
         oidc_issuer="https://sso.example.com/realms/test",
         oidc_jwks_url=jwks_url,
     )
-    return TestClient(create_app(config))
+    from conftest import canonical_shell
+
+    app = create_app(config)
+    app.state.backend.initialize(tmp_path / f"{LAYER_ID}.json", canonical_shell())
+    return TestClient(app)
 
 
 class TestRouteAuthEnforcement:

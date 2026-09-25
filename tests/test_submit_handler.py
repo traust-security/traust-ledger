@@ -42,19 +42,24 @@ def _app(tmp_path: Path, actor: LayerActor | None = None) -> FastAPI:
         data_dir=str(tmp_path),
         signing_required=False,
     )
-    return create_app(config, verifier=_FixedActorVerifier(actor or _verified_human()))
+    from conftest import canonical_shell
+
+    app = create_app(config, verifier=_FixedActorVerifier(actor or _verified_human()))
+    app.state.backend.initialize(tmp_path / f"{LAYER_ID}.json", canonical_shell())
+    return app
 
 
 def _submit_url(layer_id: str = LAYER_ID) -> str:
     return f"/v1/ledger/layers/{layer_id}/submit"
 
 
-def _make_event(finding_ref: str = "FIND-001", validity: str = "true_positive") -> dict:
+def _make_event(finding_ref: str = "FIND-001", validity: str = "confirmed") -> dict:
     return {
         "finding_ref": finding_ref,
         "disposition": {"validity": validity},
-        "source": {"ref": "src-001", "actor": {}},
+        "source": {"type": "triage_report", "ref": "src-001", "actor": {}},
         "recorded_at": RECORDED_AT,
+        "rationale": "Reviewed source evidence and confirmed this finding.",
     }
 
 
@@ -136,8 +141,9 @@ def test_submit_needs_review(tmp_path: Path) -> None:
         {
             "source_ref": "scan-001",
             "suggested_finding_ref": "FIND-001",
-            "queue_reason": "low_confidence",
+            "queue_reason": "weak_confirmation",
             "quote": "suspect",
+            "author": "reporter@example.test",
         }
     ]
     body = _submit_body(needs_review=items)
@@ -157,8 +163,9 @@ def test_submit_needs_review_dedup(tmp_path: Path) -> None:
     item = {
         "source_ref": "scan-001",
         "suggested_finding_ref": "FIND-001",
-        "queue_reason": "low_confidence",
+        "queue_reason": "weak_confirmation",
         "quote": "suspect",
+        "author": "reporter@example.test",
     }
     body = _submit_body(needs_review=[item])
     client.post(_submit_url(), json=body, headers=AUTH_HEADER)
@@ -212,6 +219,11 @@ def test_cli_submit(tmp_path: Path, monkeypatch) -> None:
     )
     monkeypatch.setenv("LEDGER_TOKEN", "fake-jwt-for-test")
 
+    from conftest import canonical_shell
+
+    from traust_ledger._internal.backends.file import FileBackend
+
+    FileBackend().initialize(tmp_path / f"{LAYER_ID}.json", canonical_shell())
     events_file = tmp_path / "events.json"
     events_file.write_text(json.dumps([_make_event()]))
 

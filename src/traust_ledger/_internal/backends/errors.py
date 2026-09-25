@@ -15,5 +15,9 @@ class CorruptStoredLayerError(LayerStorageError):
     """Stored payloads cannot reconstruct a valid layer document."""
 
 
+class LayerNotInitializedError(LayerStorageError):
+    """An operational write requires an explicitly initialized complete layer."""
+
+
 class LayerConflictError(LayerStorageError):
     """A write attempted to replace authoritative history."""

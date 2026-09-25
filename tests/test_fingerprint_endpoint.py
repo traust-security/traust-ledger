@@ -103,7 +103,9 @@ def test_list_layers_returns_ids(tmp_path: Path) -> None:
     import json
 
     layer_path = layer_file_path(str(tmp_path), LAYER_ID)
-    layer_path.write_text(json.dumps({"events": [], "metadata": {}}))
+    from conftest import canonical_shell
+
+    layer_path.write_text(json.dumps(canonical_shell()))
 
     client = TestClient(_app(tmp_path))
     resp = client.get("/v1/ledger/layers", headers=AUTH_HEADER)

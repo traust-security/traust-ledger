@@ -24,10 +24,13 @@ from traust_ledger.service.app import create_app
 
 
 def _good_layer() -> dict:
+    from conftest import canonical_shell
+
     layer = {
+        **canonical_shell(),
         "events": [
             {
-                "event_id": "e-001",
+                "event_id": "a" * 64,
                 "finding_ref": "FIND-001",
                 "recorded_at": "2026-01-16T00:00:00+00:00",
                 "source": {
@@ -39,7 +42,7 @@ def _good_layer() -> dict:
                 "rationale": "SQL injection confirmed.",
             }
         ],
-        "metadata": {"merkle_epoch": 0},
+        "metadata": {**canonical_shell()["metadata"], "merkle_epoch": 0},
     }
     stamp_merkle_metadata(layer)
     return layer
@@ -47,7 +50,7 @@ def _good_layer() -> dict:
 
 def _tampered_layer() -> dict:
     layer = _good_layer()
-    layer["events"][0]["rationale"] = "TAMPERED"
+    layer["events"][0]["rationale"] = "TAMPERED evidence content"
     return layer
 
 

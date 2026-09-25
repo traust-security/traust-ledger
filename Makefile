@@ -3,8 +3,16 @@ RELEASE := ./release.py
 BUMP_PARTS := patch minor major
 MOCK_IDP_NAME ?= ledger-mock-idp
 MOCK_IDP_PORT ?= 1080
+DB_CONTAINER ?= traust-postgres
+DB_IMAGE ?= docker.io/library/postgres:16
+DB_PORT ?= 5432
+DB_USER ?= traust
+DB_PASSWORD ?= traust-test-only
+DB_NAME ?= traust_test
+LEDGER_TEST_DATABASE_URL ?= postgresql+psycopg://$(DB_USER):$(DB_PASSWORD)@127.0.0.1:$(DB_PORT)/$(DB_NAME)
+export LEDGER_TEST_DATABASE_URL
 
-.PHONY: help setup sync hooks lint lint-fix test test-integration coverage coverage-html coverage-all check-release status bump $(BUMP_PARTS) openapi container mock-idp mock-idp-stop
+.PHONY: help setup sync hooks lint lint-fix test test-integration coverage coverage-html coverage-all check-release status bump $(BUMP_PARTS) openapi container mock-idp mock-idp-stop db-up db-down
 
 help:
 	@echo "Targets ($(notdir $(CURDIR))):"
@@ -21,6 +29,8 @@ help:
 	@echo "  make status         — current version, tag, git state"
 	@echo "  make bump patch|minor|major — bump VERSION + pyproject.toml"
 	@echo "  make openapi        — regenerate docs/openapi.json (+ yaml if PyYAML available)"
+	@echo "  make db-up          — start local database container for e2e tests"
+	@echo "  make db-down        — stop and remove the database container"
 	@echo "  make mock-idp       — start mock OIDC server (Docker) for dev/integration tests"
 	@echo "  make mock-idp-stop  — stop mock OIDC server"
 
@@ -28,7 +38,7 @@ setup: sync hooks
 	@echo "ready — local hooks enabled (.githooks). Bypass: git commit --no-verify"
 
 sync:
-	uv sync
+	uv sync --extra service --extra cli
 
 hooks:
 	git config core.hooksPath .githooks
@@ -98,3 +108,26 @@ mock-idp:
 
 mock-idp-stop:
 	docker stop $(MOCK_IDP_NAME) 2>/dev/null || true
+
+db-up:
+	@if podman container exists $(DB_CONTAINER) 2>/dev/null; then \
+		echo "$(DB_CONTAINER) already running"; \
+	else \
+		podman run --name $(DB_CONTAINER) --rm -d \
+			-e POSTGRES_USER=$(DB_USER) \
+			-e POSTGRES_PASSWORD=$(DB_PASSWORD) \
+			-e POSTGRES_DB=$(DB_NAME) \
+			-p 127.0.0.1:$(DB_PORT):5432 \
+			-v traust-postgres-data:/var/lib/postgresql/data \
+			$(DB_IMAGE); \
+		echo "waiting for database..."; \
+		for i in $$(seq 1 30); do \
+			podman exec $(DB_CONTAINER) pg_isready -U $(DB_USER) -q 2>/dev/null && break; \
+			sleep 1; \
+		done; \
+		echo "$(DB_CONTAINER) ready on port $(DB_PORT)"; \
+	fi
+	@echo "LEDGER_TEST_DATABASE_URL=$(LEDGER_TEST_DATABASE_URL)"
+
+db-down:
+	@podman stop $(DB_CONTAINER) 2>/dev/null || true

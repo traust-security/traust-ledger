@@ -13,6 +13,9 @@ from sqlalchemy import create_engine, func, select
 
 from traust_ledger._internal.backends import Backend, create_backend
 from traust_ledger._internal.backends.constants import BACKEND_TYPE_DB, BACKEND_TYPE_FILE
+from traust_ledger._internal.backends.db import DbBackend
+from traust_ledger._internal.backends.file import FileBackend
+from traust_ledger._internal.backends.validation import validate_layer
 from traust_ledger._internal.integrity import (
     Severity,
     stamp_merkle_metadata,
@@ -43,6 +46,19 @@ def _event(source_ref: str) -> dict[str, object]:
 def _exercise_backend(factory: BackendFactory, layer_path: Path) -> None:
     backend = factory()
     writer = LedgerWriter(backend=backend)
+    backend.initialize(
+        layer_path,
+        {
+            "metadata": {
+                "audit_report": "audit.json",
+                "repository": "https://example.test/repo",
+                "created": "2026-09-22T12:00:00Z",
+                "harness_version": "1.0.0",
+            },
+            "events": [],
+            "needs_review": [],
+        },
+    )
     first = _event("first.json")
     second = _event("second.json")
 
@@ -108,6 +124,63 @@ def _complete_layer() -> dict[str, object]:
     }
     stamp_merkle_metadata(layer)
     return layer
+
+
+@pytest.mark.parametrize(
+    "backend_type", ["sqlite", pytest.param("postgresql", marks=pytest.mark.integration)]
+)
+def test_exact_file_database_json_round_trip(backend_type: str, tmp_path: Path) -> None:
+    if backend_type == "postgresql":
+        url = os.environ.get("LEDGER_TEST_DATABASE_URL")
+        if not url:
+            pytest.skip("LEDGER_TEST_DATABASE_URL is not configured")
+        layer_id = f"exact-{uuid.uuid4().hex}"
+    else:
+        url = f"sqlite:///{tmp_path / 'exact.db'}"
+        layer_id = "exact-layer"
+    path = tmp_path / f"{layer_id}.json"
+    source = _complete_layer()
+    source["events"][0]["rationale"] = "preserves literal \x00 and event order"
+    source["events"][0]["source"]["ref"] = "migration\x00.json"
+    second = _event("second.json")
+    second["event_id"] = compute_event_id("second.json", "FIND-E2E-1", "confirmed", "open")
+    source["events"].append(second)
+    stamp_merkle_metadata(source)
+    validate_layer(source)
+    FileBackend().store(path, source)
+    engine = create_engine(url)
+    DbBackend.create_tables(engine)
+    backend = DbBackend(engine)
+    assert backend.import_layer(layer_id, FileBackend().export_layer(path)) == "inserted"
+    exported = backend.load_layer_id(layer_id)
+    validate_layer(exported)
+    assert exported == source
+    destination = tmp_path / "exported.json"
+    FileBackend().store(destination, exported)
+    assert json.loads(destination.read_text(encoding="utf-8")) == source
+    assert [event["event_id"] for event in exported["events"]] == [
+        event["event_id"] for event in source["events"]
+    ]
+    assert exported["events"][0]["rationale"] == "preserves literal \x00 and event order"
+    assert exported["events"][0]["source"]["ref"] == "migration\x00.json"
+    with engine.connect() as conn:
+        projected = conn.execute(
+            select(ledger_tables(engine.dialect.name).events.c.source_ref)
+            .where(ledger_tables(engine.dialect.name).events.c.layer_id == layer_id)
+            .order_by(ledger_tables(engine.dialect.name).events.c.seq)
+        ).first()
+    assert projected is not None
+    assert projected.source_ref == "migration\\u0000.json"
+
+
+def test_file_export_rejects_event_only_document(tmp_path: Path) -> None:
+    path = tmp_path / "legacy-event-only.json"
+    FileBackend().store(path, {"events": []})
+    with pytest.raises(ValueError, match="invalid complete layer"):
+        FileBackend().export_layer(path)
+    with pytest.raises(ValueError, match="no complete initialized shell"):
+        FileBackend().mutate(path, lambda layer: layer["events"].append({"event_id": "x"}))
+    assert FileBackend().load(path) == {"events": []}
 
 
 def test_file_to_sqlite_migration_and_materialization(

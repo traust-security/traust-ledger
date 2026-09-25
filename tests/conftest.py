@@ -110,7 +110,25 @@ def app_with_backend(tmp_path: Path, httpserver: HTTPServer) -> FastAPI:
         oidc_issuer=TEST_ISSUER,
         oidc_jwks_url=jwks_url,
     )
-    return create_app(config)
+    app = create_app(config)
+    from traust_ledger._internal.backends.file import FileBackend
+
+    FileBackend().initialize(tmp_path / f"{LAYER_ID}.json", canonical_shell())
+    return app
+
+
+def canonical_shell() -> dict:
+    """A synthetic, complete schema-v1 layer for explicit test initialization."""
+    return {
+        "metadata": {
+            "audit_report": "audit.json",
+            "repository": "https://example.test/repo",
+            "created": "2026-09-22T12:00:00Z",
+            "harness_version": "1.0.0",
+        },
+        "events": [],
+        "needs_review": [],
+    }
 
 
 @pytest.fixture()

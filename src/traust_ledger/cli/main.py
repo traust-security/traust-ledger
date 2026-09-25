@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import sys
 
+from traust_ledger._internal.backends.errors import LayerStorageError
 from traust_ledger.cli.commands import register_all_parsers
 from traust_ledger.cli.identity.commands import register_auth_parser
 
@@ -26,7 +28,11 @@ def main(argv: list[str] | None = None) -> int:
     if handler is None:
         parser.print_help()
         return 1
-    return handler(args)
+    try:
+        return handler(args)
+    except LayerStorageError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

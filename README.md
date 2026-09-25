@@ -52,10 +52,11 @@ uv sync --extra service
 ### Running tests
 
 ```bash
-make test               # unit tests only (no Docker needed)
+make test               # unit tests (no containers needed)
+make db-up              # start local Postgres container
+make test-integration   # PG e2e; uses LEDGER_TEST_DATABASE_URL
+make db-down            # tear down database
 make mock-idp           # start mock OIDC server (mockserver on :1080)
-make test-integration   # integration tests; PostgreSQL tests use LEDGER_TEST_DATABASE_URL
-make mock-idp-stop      # tear down mock server
 make coverage-all       # full coverage: starts mock-idp, runs all tests, stops it
 ```
 
@@ -91,16 +92,14 @@ Consumers pin both:
 
 ```toml
 [project]
-dependencies = ["traust-ledger>=0.6.33", "traust-contracts>=0.35.0"]
+dependencies = ["traust-ledger>=0.7.0", "traust-contracts>=0.37.0"]
 
 [tool.uv.sources]
-traust-ledger = { git = "ssh://git@<your-forge>/<namespace>/traust-ledger.git", tag = "v0.6.33" }
-traust-contracts = { git = "https://github.com/traust-security/traust-contracts.git", tag = "v0.35.0" }
+traust-ledger = { git = "ssh://git@<your-forge>/<namespace>/traust-ledger.git", tag = "v0.7.0" }
+traust-contracts = { git = "https://github.com/traust-security/traust-contracts.git", tag = "v0.37.0" }
 ```
 
-The authoritative pins for this repo are in its own `pyproject.toml` — if the block above
-disagrees with it, `pyproject.toml` wins and this README is stale.
-
+Authoritative pins are in `pyproject.toml`; if the above disagrees, `pyproject.toml` wins.
 Local mono-checkout: point `[tool.uv.sources]` at a sibling path.
 
 ## Storage and historical migration

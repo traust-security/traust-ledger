@@ -8,12 +8,14 @@ from pathlib import Path
 
 from traust_contracts.v1.models.layer import LayerActor
 
+from traust_ledger._internal.backends.errors import LayerStorageError
 from traust_ledger._internal.errors import EventIdMismatchError as _InternalEventIdMismatchError
 from traust_ledger._internal.identity import ALGO_VERSION
 from traust_ledger._internal.layer_finalize import finalize_layer, require_signing_configured
 from traust_ledger._internal.writer import LedgerWriter, review_item_key
 from traust_ledger.config import ServiceConfig
 from traust_ledger.constants import LAYER_ID_PATTERN, STATUS_ACCEPTED
+from traust_ledger.errors import ValidationError
 from traust_ledger.models import BatchSubmitRequest, SubmitResponse
 from traust_ledger.paths import layer_file_path
 from traust_ledger.service.errors import (
@@ -122,6 +124,7 @@ def submit_batch(
             if isinstance(item, dict):
                 item.setdefault("submitted_by", actor.to_dict())
                 item.setdefault("source_ref", body.source_ref)
+                item.setdefault("queued_at", body.recorded_at)
     else:
         items = []
 
@@ -132,6 +135,8 @@ def submit_batch(
             )
         except _InternalEventIdMismatchError as exc:
             raise EventIdMismatchError(supplied=exc.supplied, canonical=exc.canonical) from exc
+        except LayerStorageError as exc:
+            raise ValidationError(detail=str(exc)) from exc
     elif stamped_events:
         try:
             event_ids, merkle_root = writer.append_events_finalized(
@@ -141,8 +146,13 @@ def submit_batch(
             )
         except _InternalEventIdMismatchError as exc:
             raise EventIdMismatchError(supplied=exc.supplied, canonical=exc.canonical) from exc
+        except LayerStorageError as exc:
+            raise ValidationError(detail=str(exc)) from exc
     elif items:
-        queue_added = writer.append_needs_review(layer_path, items)
+        try:
+            queue_added = writer.append_needs_review(layer_path, items)
+        except LayerStorageError as exc:
+            raise ValidationError(detail=str(exc)) from exc
         event_ids = []
         merkle_root = ""
     else:

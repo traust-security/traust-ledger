@@ -110,9 +110,9 @@ DB_FILENAME: Final = "ledger.db"
 
 TEST_LAYER_ID: Final = "deploy-invariant-layer"
 TEST_LAYER_PATH: Final = Path(TEST_LAYER_ID)
-EVENT_ID_ALPHA: Final = "evt-alpha"
-EVENT_ID_BETA: Final = "evt-beta"
-EVENT_ID_GAMMA: Final = "evt-gamma"
+EVENT_ID_ALPHA: Final = "a" * 64
+EVENT_ID_BETA: Final = "b" * 64
+EVENT_ID_GAMMA: Final = "c" * 64
 
 SQL_STATEMENT_DELETE: Final = "DELETE"
 SQL_STATEMENT_INSERT: Final = "INSERT"
@@ -366,12 +366,28 @@ def _stop_service(proc: subprocess.Popen[str]) -> None:
         proc.wait()
 
 
-def _sample_event(event_id: str) -> dict[str, str]:
-    return {"event_id": event_id}
+def _sample_event(event_id: str) -> dict:
+    return {
+        "event_id": event_id,
+        "finding_ref": "FIND-001",
+        "recorded_at": "2026-09-22T12:00:00Z",
+        "source": {
+            "type": "triage_report",
+            "ref": f"source:{event_id}",
+            "actor": {"kind": "machine"},
+        },
+        "disposition": {"validity": "confirmed", "resolution": "open"},
+        "rationale": "Reviewed the evidence and confirmed the finding.",
+    }
 
 
-def _layer_with_event_ids(*event_ids: str) -> dict[str, list[dict[str, str]]]:
-    return {LAYER_EVENTS_KEY: [_sample_event(event_id) for event_id in event_ids]}
+def _layer_with_event_ids(*event_ids: str) -> dict:
+    from conftest import canonical_shell
+
+    return {
+        **canonical_shell(),
+        LAYER_EVENTS_KEY: [_sample_event(event_id) for event_id in event_ids],
+    }
 
 
 def _memory_db_engine() -> Engine:

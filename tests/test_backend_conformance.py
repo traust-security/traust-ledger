@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 
 import pytest
+from conftest import canonical_shell
 from sqlalchemy import create_engine
 
 from traust_ledger._internal.backends import Backend, create_backend
@@ -31,14 +32,14 @@ from traust_ledger._internal.writer import LedgerWriter
 
 BACKEND_PARAM_FILE = BACKEND_TYPE_FILE
 BACKEND_PARAM_DB = BACKEND_TYPE_DB
-SAMPLE_EVENT_ID = "evt-conformance-001"
+SAMPLE_EVENT_ID = "b" * 64
 SAMPLE_FINDING_REF = "TEST-CONFORMANCE-001"
 SAMPLE_SOURCE_REF = "conformance-test"
 SAMPLE_VALIDITY = "confirmed"
 SAMPLE_RESOLUTION = "open"
 TAMPERED_DISPOSITION = "tampered"
 SIMULATED_WRITE_FAILURE = "simulated write failure"
-MERKLE_EVENT_ID = "E-001"
+MERKLE_EVENT_ID = "a" * 64
 MERKLE_DISPOSITION = "confirmed"
 MERKLE_ACTOR = "tester"
 MERKLE_TIMESTAMP = "2026-08-14T00:00:00Z"
@@ -61,23 +62,20 @@ def backend(request: pytest.FixtureRequest) -> Backend:
 
 def _sample_append_event() -> dict:
     return {
-        "source": {"ref": SAMPLE_SOURCE_REF, "actor": {"kind": "machine"}},
+        "source": {"type": "triage_report", "ref": SAMPLE_SOURCE_REF, "actor": {"kind": "machine"}},
         "finding_ref": SAMPLE_FINDING_REF,
+        "recorded_at": "2026-08-14T00:00:00Z",
         "disposition": {"validity": SAMPLE_VALIDITY, "resolution": SAMPLE_RESOLUTION},
+        "rationale": "Reviewed and confirmed the finding in the test repository.",
     }
 
 
 def _merkle_event() -> dict:
-    return {
-        "event_id": MERKLE_EVENT_ID,
-        "disposition": MERKLE_DISPOSITION,
-        "actor": MERKLE_ACTOR,
-        "timestamp": MERKLE_TIMESTAMP,
-    }
+    return {**_sample_append_event(), "event_id": MERKLE_EVENT_ID}
 
 
 def _layer_with_events(event: dict) -> dict:
-    return {LAYER_EVENTS_KEY: [event]}
+    return {**canonical_shell(), LAYER_EVENTS_KEY: [event]}
 
 
 def test_atomic_append(backend: Backend, tmp_path: Path) -> None:
@@ -94,6 +92,7 @@ def test_idempotent_reappend(backend: Backend, tmp_path: Path) -> None:
     layer_path = tmp_path / "layer.json"
     writer = LedgerWriter(backend=backend)
     event = _sample_append_event()
+    backend.initialize(layer_path, canonical_shell())
     first_id = writer.append_event(layer_path, event.copy())
     second_id = writer.append_event(layer_path, event.copy())
     assert first_id == second_id
@@ -104,7 +103,7 @@ def test_idempotent_reappend(backend: Backend, tmp_path: Path) -> None:
 def test_mutated_events_fail_verify(backend: Backend, tmp_path: Path) -> None:
     """Tampered event content is detected by Merkle verification."""
     layer_path = tmp_path / "layer.json"
-    layer: dict = {"metadata": {}, LAYER_EVENTS_KEY: [_merkle_event()]}
+    layer = _layer_with_events(_merkle_event())
     stamp_merkle_metadata(layer)
     backend.store(layer_path, layer)
     tampered = backend.load(layer_path)
@@ -148,9 +147,9 @@ def test_round_trip_fidelity(backend: Backend, tmp_path: Path) -> None:
     """Reloaded data matches what was stored."""
     layer_path = tmp_path / "layer.json"
     payload = {
+        **canonical_shell(),
         LAYER_EVENTS_KEY: [_merkle_event()],
-        "metadata": {ROUND_TRIP_METADATA_KEY: ROUND_TRIP_METADATA_VALUE},
-        "extra": ROUND_TRIP_EXTRA,
+        "baseline_claims": {"F-1": "a" * 64},
     }
     backend.store(layer_path, payload)
     if isinstance(backend, FileBackend):
@@ -179,7 +178,7 @@ def test_iter_layers_supports_file_and_database_identity_spaces(tmp_path):
 
     data_dir = tmp_path / "data"
     data_dir.mkdir()
-    layer = {"events": [], "metadata": {}}
+    layer = canonical_shell()
 
     engine = create_engine("sqlite://")
     DbBackend.create_tables(engine)
@@ -201,23 +200,23 @@ def test_iter_layers_supports_file_and_database_identity_spaces(tmp_path):
 def test_mutate_applies_callback_and_stores(backend: Backend, tmp_path: Path) -> None:
     """mutate: callback's mutation is persisted."""
     layer_path = tmp_path / "layer.json"
-    base = {LAYER_EVENTS_KEY: [], "metadata": {}}
+    base = canonical_shell()
     backend.store(layer_path, base)
 
     def _add_note(layer: dict) -> str:
-        layer.setdefault("metadata", {})["note"] = "mutated"
+        layer.setdefault("metadata", {})["audit_report_sha256"] = "a" * 64
         return "ok"
 
     result = backend.mutate(layer_path, _add_note)
     assert result == "ok"
     reloaded = backend.load(layer_path)
-    assert reloaded["metadata"]["note"] == "mutated"
+    assert reloaded["metadata"]["audit_report_sha256"] == "a" * 64
 
 
 def test_mutate_with_stamp_and_sign(backend: Backend, tmp_path: Path) -> None:
     """mutate: finalization (stamp + sign) inside the callback persists."""
     layer_path = tmp_path / "layer.json"
-    layer = {LAYER_EVENTS_KEY: [_merkle_event()], "metadata": {}}
+    layer = _layer_with_events(_merkle_event())
     backend.store(layer_path, layer)
 
     def _stamp(data: dict) -> None:
@@ -233,7 +232,7 @@ def test_mutate_with_stamp_and_sign(backend: Backend, tmp_path: Path) -> None:
 def test_mutate_rollback_on_error(backend: Backend, tmp_path: Path) -> None:
     """mutate: if the callback raises, nothing is stored."""
     layer_path = tmp_path / "layer.json"
-    original = {LAYER_EVENTS_KEY: [{"event_id": "original"}], "metadata": {}}
+    original = _layer_with_events(_merkle_event())
     backend.store(layer_path, original)
 
     def _boom(layer: dict) -> None:
@@ -256,7 +255,7 @@ def test_mutate_finalize_signing_required_raises(backend: Backend, tmp_path: Pat
     from traust_ledger.service.errors import SigningFailedError
 
     layer_path = tmp_path / "layer.json"
-    layer = {LAYER_EVENTS_KEY: [_merkle_event()], "metadata": {}}
+    layer = _layer_with_events(_merkle_event())
     backend.store(layer_path, layer)
 
     config = ServiceConfig(signing_required=True, signing_method="none")

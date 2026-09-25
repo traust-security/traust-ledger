@@ -5,12 +5,15 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Request
 from traust_contracts.v1.models.layer import LayerActor
 
+from traust_ledger._internal.backends.errors import LayerNotInitializedError
+from traust_ledger._internal.backends.validation import validate_layer
 from traust_ledger._internal.writer import LedgerWriter
 from traust_ledger.config import ServiceConfig
 from traust_ledger.handlers.event_handler import submit_event
 from traust_ledger.handlers.events_handler import query_layer_events
 from traust_ledger.handlers.findings_handler import resolve_all_findings, resolve_findings
 from traust_ledger.handlers.fingerprint_handler import compute_fingerprints
+from traust_ledger.handlers.initialize_handler import initialize_layer
 from traust_ledger.handlers.layer_handler import load_layer
 from traust_ledger.handlers.resolve_handler import resolve_review_item
 from traust_ledger.handlers.sign_handler import sign_layer
@@ -34,6 +37,7 @@ from traust_ledger.models import (
 )
 from traust_ledger.paths import layer_file_path
 from traust_ledger.service.auth import require_identity, resolve_actor
+from traust_ledger.service.errors import LayerNotFoundError
 from traust_ledger.service.models import ErrorDetail, HealthResponse, ResolveRequest
 from traust_ledger.service.route_constants import (
     ROUTE_EVENTS,
@@ -107,6 +111,16 @@ async def resolve_review(
         _config(request),
     )
     return ResolveResponse(**result)
+
+
+@router.post("/v1/ledger/layers/{layer_id}/initialize")
+async def post_initialize_layer(
+    layer_id: str,
+    shell: dict,
+    request: Request,
+    actor: Annotated[LayerActor, Depends(resolve_actor)],
+) -> dict[str, str]:
+    return initialize_layer(layer_id, shell, actor, request.app.state.backend, _config(request))
 
 
 @router.get(
@@ -292,9 +306,15 @@ async def sign_layer_endpoint(
     config = _config(request)
     backend = request.app.state.backend
     path = layer_file_path(config.data_dir, layer_id)
-    layer = backend.load(path)
-    result = sign_layer(layer, config, rekor=rekor)
-    backend.store(path, layer)
+
+    def sign(layer: dict) -> dict:
+        validate_layer(layer)
+        return sign_layer(layer, config, rekor=rekor)
+
+    try:
+        result = backend.mutate(path, sign)
+    except LayerNotInitializedError as exc:
+        raise LayerNotFoundError(layer_id=layer_id) from exc
     return {**result, "layer_id": layer_id}
 
 
@@ -316,9 +336,15 @@ async def stamp_layer_endpoint(
     config = _config(request)
     backend = request.app.state.backend
     path = layer_file_path(config.data_dir, layer_id)
-    layer = backend.load(path)
-    result = stamp_event_identities(layer, body.fingerprints, config, layer_id=layer_id)
-    backend.store(path, layer)
+
+    def stamp(layer: dict) -> dict:
+        validate_layer(layer)
+        return stamp_event_identities(layer, body.fingerprints, config, layer_id=layer_id)
+
+    try:
+        result = backend.mutate(path, stamp)
+    except LayerNotInitializedError as exc:
+        raise LayerNotFoundError(layer_id=layer_id) from exc
     return StampResponse(**result)
 
 

@@ -642,9 +642,12 @@ class TestMockOIDCE2EREST:
             oidc_issuer=self.TEST_ISSUER,
             oidc_jwks_url=jwks_url,
         )
+        from conftest import canonical_shell
         from fastapi.testclient import TestClient
 
-        return TestClient(create_app(config))
+        app = create_app(config)
+        app.state.backend.initialize(tmp_path / f"{LAYER_ID}.json", canonical_shell())
+        return TestClient(app)
 
     def test_human_jwt_through_delegating_adapter(self, rest_client, rsa_keypair):
         token = _make_oidc_jwt(rsa_keypair, email="alice@example.com", sub="alice@example.com")

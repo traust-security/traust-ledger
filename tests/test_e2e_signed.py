@@ -88,6 +88,9 @@ def signed_client(
         oidc_jwks_url=jwks_url,
     )
     app = create_app(config)
+    from conftest import canonical_shell
+
+    app.state.backend.initialize(tmp_path / f"{LAYER}.json", canonical_shell())
     headers = auth_header(rsa_keypair, identity="alice@e2e.test")
     yield TestClient(app), tmp_path, headers
 

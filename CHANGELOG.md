@@ -2,6 +2,18 @@
 
 All notable changes to traust-ledger are documented here.
 
+## [0.7.0]
+
+### Changed
+
+- Upgraded to `traust-contracts` 0.37.0. Append-only triggers are now installed
+  by the contracts SQL during bootstrap; the Ledger's `_install_sqlite_guards()`
+  and `_install_postgresql_guards()` are idempotent re-applications.
+- Fixed `LEDGER_TEST_DATABASE_URL` default to use `postgresql+psycopg://`
+  (psycopg v3 driver) instead of bare `postgresql://` which requires psycopg2.
+- Added `make db-up` / `make db-down` for local PostgreSQL container lifecycle,
+  matching the contracts repo convention.
+
 ## [0.6.33]
 
 ### Changed
