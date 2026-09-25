@@ -22,7 +22,7 @@ from pydantic import BaseModel
 from traust_contracts.v1.models.layer import LayerActor
 
 from traust_ledger._internal.backends import Backend, create_backend
-from traust_ledger._internal.backends.constants import EMPTY_LAYER
+from traust_ledger._internal.backends.errors import LayerStorageError
 from traust_ledger._internal.integrity.signing import SigningConfig
 from traust_ledger._internal.layer_finalize import finalize_layer
 from traust_ledger._internal.writer import LedgerWriter
@@ -36,6 +36,7 @@ from traust_ledger.auth.verifier import TokenVerifierPort
 from traust_ledger.config import ServiceConfig
 from traust_ledger.handlers.events_handler import query_layer_events
 from traust_ledger.handlers.findings_handler import resolve_all_findings, resolve_findings
+from traust_ledger.handlers.initialize_handler import initialize_layer
 from traust_ledger.handlers.layer_handler import load_layer
 from traust_ledger.handlers.resolve_handler import resolve_review_item
 from traust_ledger.handlers.submit_handler import submit_batch
@@ -259,6 +260,7 @@ class LedgerClient:
         """
         from traust_ledger.errors import ServiceError
 
+        self._actor()
         path = layer_file_path(self._config.data_dir, layer_id)
         config = self._config
 
@@ -269,6 +271,8 @@ class LedgerClient:
             merkle_root = self._backend.mutate(path, _finalize)
         except ServiceError as exc:
             raise LedgerError(exc.detail) from exc
+        except LayerStorageError as exc:
+            raise LedgerError(str(exc)) from exc
         return {"status": "signed", "merkle_root": merkle_root, "layer_id": layer_id}
 
     def patch_metadata(
@@ -284,6 +288,7 @@ class LedgerClient:
         """
         from traust_ledger.errors import ServiceError
 
+        self._actor()
         path = layer_file_path(self._config.data_dir, layer_id)
         config = self._config
 
@@ -301,6 +306,8 @@ class LedgerClient:
             merkle_root = self._backend.mutate(path, _patch_and_finalize)
         except ServiceError as exc:
             raise LedgerError(exc.detail) from exc
+        except LayerStorageError as exc:
+            raise LedgerError(str(exc)) from exc
         return {"merkle_root": merkle_root, "layer_id": layer_id}
 
     def stamp_event_identities(
@@ -322,6 +329,7 @@ class LedgerClient:
             stamp_event_identities as _stamp,
         )
 
+        self._actor()
         path = layer_file_path(self._config.data_dir, layer_id)
         config = self._config
 
@@ -332,6 +340,8 @@ class LedgerClient:
             return self._backend.mutate(path, _stamp_and_finalize)
         except ServiceError as exc:
             raise LedgerError(exc.detail) from exc
+        except LayerStorageError as exc:
+            raise LedgerError(str(exc)) from exc
 
     def create(
         self,
@@ -339,23 +349,19 @@ class LedgerClient:
         *,
         shell: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Bootstrap an empty layer.  Unsigned — no events to root."""
-        path = layer_file_path(self._config.data_dir, layer_id)
-        base = shell if shell is not None else dict(EMPTY_LAYER)
-        if "metadata" not in base:
-            base["metadata"] = {}
-        self._backend.store(path, base)
-        return {"layer_id": layer_id}
+        """OIDC-gated creation; the caller must supply a complete layer shell."""
+        if shell is None:
+            raise LedgerError("a complete layer shell is required for initialization")
+        return self._invoke(
+            initialize_layer, layer_id, shell, self._actor(), self._backend, self._config
+        )
 
     def store(self, layer_id: str, layer: dict[str, Any]) -> dict[str, Any]:
-        """Persist a fully-materialized layer through the backend.
-
-        For callers that build or mutate a whole layer in memory (e.g. the
-        cumulative projection) and sign() separately. Unsigned on its own.
-        """
-        path = layer_file_path(self._config.data_dir, layer_id)
-        self._backend.store(path, layer)
-        return {"layer_id": layer_id}
+        """Unsafe arbitrary layer replacement is unavailable through the SDK."""
+        raise LedgerError(
+            "store() cannot replace authoritative history; use create() or "
+            "the administrative ledger migrate command"
+        )
 
     def verify(self, layer_id: str, *, check_signatures: bool = False) -> dict[str, Any]:
         layer = load_layer(layer_id, self._backend, self._config)
@@ -517,6 +523,8 @@ class LedgerClient:
             result = fn(*args, **kwargs)
         except ServiceError as exc:
             raise LedgerError(exc.detail) from exc
+        except LayerStorageError as exc:
+            raise LedgerError(str(exc)) from exc
         if isinstance(result, BaseModel):
             return result.model_dump()
         if isinstance(result, dict):

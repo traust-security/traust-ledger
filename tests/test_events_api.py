@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
 import pytest
-from conftest import AUTH_HEADER, LAYER_ID, TEST_ISSUER
+from conftest import AUTH_HEADER, LAYER_ID, TEST_ISSUER, canonical_shell
 from fastapi.testclient import TestClient
 from pytest_httpserver import HTTPServer
 
@@ -14,6 +15,10 @@ from traust_ledger._internal.integrity import stamp_merkle_metadata
 from traust_ledger.config import ServiceConfig
 from traust_ledger.paths import layer_file_path
 from traust_ledger.service.app import create_app
+
+
+def _event_id(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
 
 
 def _make_event(
@@ -27,11 +32,13 @@ def _make_event(
     **extra: object,
 ) -> dict:
     event: dict = {
-        "event_id": event_id,
+        "event_id": hashlib.sha256(event_id.encode()).hexdigest(),
         "finding_ref": finding_ref,
         "recorded_at": recorded_at,
         "source": {
-            "type": source_type,
+            "type": {"triage": "triage_report", "validation": "validation_report"}.get(
+                source_type, source_type
+            ),
             "ref": f"{source_type}:sign",
             "actor": {
                 "kind": actor_kind,
@@ -40,14 +47,15 @@ def _make_event(
             },
         },
         "disposition": {"validity": validity},
-        "rationale": "test",
+        "rationale": "Reviewed the finding against source evidence.",
     }
     event.update(extra)
     return event
 
 
 def _layer_with_events(events: list[dict]) -> dict:
-    layer = {"events": events, "metadata": {"merkle_epoch": 0}}
+    layer = {**canonical_shell(), "events": events}
+    layer["metadata"]["merkle_epoch"] = 0
     stamp_merkle_metadata(layer)
     return layer
 
@@ -77,7 +85,7 @@ def _seed_layer(tmp_path: Path, layer_id: str, events: list[dict]) -> None:
 def _seed_empty_layer(tmp_path: Path, layer_id: str) -> None:
     path = layer_file_path(str(tmp_path), layer_id)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"events": [], "metadata": {}}))
+    path.write_text(json.dumps(canonical_shell()))
 
 
 class TestEventsAPI:
@@ -99,7 +107,7 @@ class TestEventsAPI:
         assert body["layer_id"] == LAYER_ID
         assert body["total"] == 2
         assert len(body["events"]) == 2
-        assert [e["event_id"] for e in body["events"]] == ["e1", "e2"]
+        assert [e["event_id"] for e in body["events"]] == [_event_id("e1"), _event_id("e2")]
 
     def test_finding_ref_filter(self, events_client, tmp_path) -> None:
         _seed_layer(
@@ -120,7 +128,7 @@ class TestEventsAPI:
         assert body["total"] == 2
         assert len(body["events"]) == 2
         assert all(e["finding_ref"] == "FIND-A" for e in body["events"])
-        assert [e["event_id"] for e in body["events"]] == ["e1", "e3"]
+        assert [e["event_id"] for e in body["events"]] == [_event_id("e1"), _event_id("e3")]
 
     def test_source_type_filter(self, events_client, tmp_path) -> None:
         _seed_layer(
@@ -133,14 +141,14 @@ class TestEventsAPI:
             ],
         )
         r = events_client.get(
-            f"/v1/ledger/layers/{LAYER_ID}/events?source_type=triage",
+            f"/v1/ledger/layers/{LAYER_ID}/events?source_type=triage_report",
             headers=AUTH_HEADER,
         )
         assert r.status_code == 200
         body = r.json()
         assert body["total"] == 1
-        assert body["events"][0]["event_id"] == "e2"
-        assert body["events"][0]["source"]["type"] == "triage"
+        assert body["events"][0]["event_id"] == _event_id("e2")
+        assert body["events"][0]["source"]["type"] == "triage_report"
 
     def test_combined_filters(self, events_client, tmp_path) -> None:
         _seed_layer(
@@ -153,13 +161,13 @@ class TestEventsAPI:
             ],
         )
         r = events_client.get(
-            f"/v1/ledger/layers/{LAYER_ID}/events?finding_ref=FIND-A&source_type=triage",
+            f"/v1/ledger/layers/{LAYER_ID}/events?finding_ref=FIND-A&source_type=triage_report",
             headers=AUTH_HEADER,
         )
         assert r.status_code == 200
         body = r.json()
         assert body["total"] == 1
-        assert body["events"][0]["event_id"] == "e2"
+        assert body["events"][0]["event_id"] == _event_id("e2")
 
     def test_pagination(self, events_client, tmp_path) -> None:
         events = [_make_event(f"e{i}", f"FIND-{i}", "confirmed") for i in range(5)]
@@ -172,7 +180,7 @@ class TestEventsAPI:
         b1 = r1.json()
         assert b1["total"] == 5
         assert len(b1["events"]) == 2
-        assert [e["event_id"] for e in b1["events"]] == ["e0", "e1"]
+        assert [e["event_id"] for e in b1["events"]] == [_event_id("e0"), _event_id("e1")]
 
         r2 = events_client.get(
             f"/v1/ledger/layers/{LAYER_ID}/events?limit=2&offset=2",
@@ -181,12 +189,13 @@ class TestEventsAPI:
         b2 = r2.json()
         assert b2["total"] == 5
         assert len(b2["events"]) == 2
-        assert [e["event_id"] for e in b2["events"]] == ["e2", "e3"]
+        assert [e["event_id"] for e in b2["events"]] == [_event_id("e2"), _event_id("e3")]
 
     def test_empty_layer(self, events_client, tmp_path) -> None:
         _seed_empty_layer(tmp_path, LAYER_ID)
         r = events_client.get(f"/v1/ledger/layers/{LAYER_ID}/events", headers=AUTH_HEADER)
-        assert r.status_code == 404
+        assert r.status_code == 200
+        assert r.json()["total"] == 0
 
     def test_total_reflects_filtered_count_not_page_size(self, events_client, tmp_path) -> None:
         events = [_make_event(f"e{i}", "FIND-A", "confirmed") for i in range(10)]

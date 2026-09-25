@@ -59,10 +59,12 @@ If it **computes or reads** → importable from SDK-tier modules.
 ### Database integrity rules
 
 - `events` is append-only: existing payloads must be an exact prefix; only suffix inserts.
+- Append-only triggers are shipped by `traust-contracts` in the DDL itself. Ledger's
+  guard installation is idempotent (`IF NOT EXISTS` / `DROP + CREATE`).
 - Never add event `UPDATE`, `DELETE`, replacement, or truncation paths.
 - `layers` is the mutable current envelope but cannot be deleted.
 - `materialized_findings` is rebuildable and never integrity authority.
-- PostgreSQL changes require `LEDGER_TEST_DATABASE_URL` integration coverage.
+- PostgreSQL e2e: `make db-up` then `make test-integration` (`LEDGER_TEST_DATABASE_URL`).
 - File, SQLite, and PostgreSQL storage lifecycle changes require `tests/test_storage_e2e.py`.
 
 ## Three-entry-point symmetry

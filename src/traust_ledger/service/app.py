@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from traust_ledger._internal.backends import create_backend
 from traust_ledger._internal.backends.constants import BACKEND_TYPE_DB
+from traust_ledger._internal.backends.errors import LayerStorageError
 from traust_ledger._internal.writer import LedgerWriter
 from traust_ledger.config import ServiceConfig
 from traust_ledger.service.errors import SigningRequiredError
@@ -87,6 +88,10 @@ def create_app(
     from fastapi.responses import JSONResponse
 
     from traust_ledger.errors import AuthError, InternalError, NotFoundError, ServiceError
+
+    @app.exception_handler(LayerStorageError)
+    async def _storage_error(request: Request, exc: LayerStorageError) -> JSONResponse:
+        return JSONResponse(status_code=422, content={"detail": str(exc)})
 
     @app.exception_handler(ServiceError)
     async def _service_error_handler(request: Request, exc: ServiceError) -> JSONResponse:

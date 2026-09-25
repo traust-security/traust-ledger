@@ -46,7 +46,14 @@ def _optional_object(value: object) -> Mapping[str, object]:
 
 
 def _optional_string(value: object) -> str | None:
-    return value if isinstance(value, str) else None
+    """Project a string into PostgreSQL-compatible text; payload bytes remain authoritative.
+
+    A literal NUL cannot be represented in PostgreSQL text. Escape it only in
+    derived columns; queries against those columns must use the same projection.
+    """
+    if isinstance(value, str):
+        return value.replace("\\", "\\\\").replace("\x00", "\\u0000")
+    return None
 
 
 def _optional_integer(value: object) -> int | None:

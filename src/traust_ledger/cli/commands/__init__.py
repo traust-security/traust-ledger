@@ -5,6 +5,7 @@ import argparse
 from traust_ledger.cli.commands.countersign import cmd_countersign
 from traust_ledger.cli.commands.event import cmd_event
 from traust_ledger.cli.commands.fingerprint import cmd_fingerprint
+from traust_ledger.cli.commands.initialize import cmd_initialize
 from traust_ledger.cli.commands.materialize import register_materialize_parser
 from traust_ledger.cli.commands.migrate import register_migrate_parser
 from traust_ledger.cli.commands.query import register_query_parser
@@ -37,6 +38,11 @@ def register_write_parsers(subparsers: argparse._SubParsersAction) -> None:
     ev_p.add_argument("file_path", help="Path to event JSON file")
     ev_p.add_argument("--kind", required=True, help="Event kind")
     ev_p.set_defaults(handler=cmd_event)
+
+    init_p = subparsers.add_parser("initialize", help="Create a complete layer from JSON")
+    init_p.add_argument("layer_file", help="Complete schema-valid layer JSON")
+    init_p.add_argument("--layer", required=True, help="Target layer ID")
+    init_p.set_defaults(handler=cmd_initialize)
 
     sub_p = subparsers.add_parser("submit", help="Batch-submit pre-formed events and queue items")
     sub_p.add_argument("events_file", help="JSON file: array or {events, needs_review}")

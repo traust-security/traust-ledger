@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import fcntl
 import json
+import logging
 import os
 import tempfile
 from collections.abc import Callable
@@ -20,8 +21,11 @@ from .constants import (
     NEWLINE,
     TEMP_FILE_SUFFIX,
 )
+from .errors import LayerConflictError, LayerNotInitializedError
+from .validation import validate_layer
 
 T = TypeVar("T")
+logger = logging.getLogger(__name__)
 
 
 class FileBackend:
@@ -40,10 +44,9 @@ class FileBackend:
         of which three were reports. An empty layer is not harmless: it flows
         into the projection as a layer with zero findings.
 
-        Shape, not filename, is the test — the service's own data dir names
-        files `<layer_id>.json`, while a corpus tree names them
-        `<repo>-findings-layer.json`, and a rule keyed on either spelling would
-        be wrong somewhere.
+        Schema-valid complete layers, not filename shapes, are the test. A
+        legacy event-only file is raw evidence, not a canonical layer. Paths
+        can use service IDs or corpus findings-layer names.
         """
         if self._data_dir is None or not self._data_dir.exists():
             return []
@@ -55,30 +58,42 @@ class FileBackend:
 
     @staticmethod
     def _is_layer(path: Path) -> bool:
-        """True when the file's shape is a disposition layer.
-
-        The discriminator is an `events` LIST and nothing more. A first attempt
-        also required `metadata.audit_report` and `needs_review`, which rejected
-        the service's own layers: `EMPTY_LAYER` is `{"events": []}`, so a
-        freshly created layer has neither. Reports are excluded anyway — an
-        audit or triage report carries `findings` and no `events` key at all.
-
-        Deliberately cheap and total: a file that cannot be parsed is not a
-        layer for listing purposes, and `load()` still raises for a caller that
-        asks for it by name.
-        """
+        """Only complete schema-valid files are canonical layers for iteration."""
         try:
             with path.open(encoding="utf-8") as fh:
                 doc = json.load(fh)
         except (OSError, json.JSONDecodeError):
             return False
-        return isinstance(doc, dict) and isinstance(doc.get("events"), list)
+        if not isinstance(doc, dict):
+            return False
+        try:
+            validate_layer(doc)
+        except ValueError as exc:
+            if isinstance(doc.get("events"), list):
+                logger.warning("skipping noncanonical layer %s: %s", path, exc)
+            return False
+        return True
 
     def load(self, path: Path) -> dict:
         """Load a layer from disk. Creates empty layer if file absent."""
         resolved = Path(path)
         with self._file_lock(resolved):
             return self._load_unlocked(resolved)
+
+    def initialize(self, path: Path, data: dict) -> None:
+        """Create a schema-valid shell without replacing an existing file."""
+        validate_layer(data)
+        resolved = Path(path)
+        with self._file_lock(resolved):
+            if resolved.exists():
+                raise LayerConflictError(f"layer {resolved.stem!r} already exists")
+            self._store_unlocked(resolved, data)
+
+    def export_layer(self, path: Path) -> dict:
+        """Export only complete portable layer documents (unlike legacy raw load)."""
+        layer = self.load(path)
+        validate_layer(layer)
+        return layer
 
     def store(self, path: Path, data: dict) -> None:
         """Store a layer to disk atomically (tempfile + replace)."""
@@ -90,8 +105,25 @@ class FileBackend:
         """Load, mutate, and store under a single file lock."""
         resolved = Path(path)
         with self._file_lock(resolved):
+            if not resolved.exists():
+                raise LayerNotInitializedError(
+                    f"layer {resolved.stem!r} is not initialized; provide a complete layer shell"
+                )
             data = self._load_unlocked(resolved)
+            metadata = data.get("metadata") if isinstance(data, dict) else None
+            if (
+                not isinstance(metadata, dict)
+                or not all(
+                    isinstance(metadata.get(key), str) and metadata[key]
+                    for key in ("audit_report", "repository", "created", "harness_version")
+                )
+                or not isinstance(data.get("needs_review"), list)
+            ):
+                raise LayerNotInitializedError(
+                    f"layer {resolved.stem!r} has no complete initialized shell"
+                )
             result = mutator(data)
+            validate_layer(data)
             self._store_unlocked(resolved, data)
             return result
 

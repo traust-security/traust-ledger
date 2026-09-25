@@ -50,29 +50,30 @@ def test_reports_in_the_directory_are_not_listed_as_layers(tmp_path):
         json.dumps({"title": "t", "metadata": {"date": "2026-08-20"}, "findings": []})
     )
     (tmp_path / "repo-triage.json").write_text(json.dumps({"findings": []}))
-    (tmp_path / "repo-findings-layer.json").write_text(
-        json.dumps(
-            {
-                "metadata": {"audit_report": "repo-security-audit.json"},
-                "events": [],
-                "needs_review": [],
-            }
-        )
-    )
+    from conftest import canonical_shell
+
+    shell = canonical_shell()
+    shell["metadata"]["audit_report"] = "repo-security-audit.json"
+    (tmp_path / "repo-findings-layer.json").write_text(json.dumps(shell))
 
     assert FileBackend(tmp_path).list_layer_ids() == ["repo-findings-layer"]
 
 
-def test_a_service_created_empty_layer_still_counts(tmp_path):
-    """EMPTY_LAYER is {"events": []} — no metadata, no needs_review. A stricter
-    shape test rejected the service's own layers and broke eight tests."""
-    (tmp_path / "fresh.json").write_text(json.dumps({"events": []}))
+def test_only_explicitly_initialized_empty_layer_counts(tmp_path, caplog):
+    """An event-only file is raw legacy evidence, not a canonical layer."""
+    from conftest import canonical_shell
+
+    (tmp_path / "legacy.json").write_text(json.dumps({"events": []}))
+    (tmp_path / "fresh.json").write_text(json.dumps(canonical_shell()))
     assert FileBackend(tmp_path).list_layer_ids() == ["fresh"]
+    assert "skipping noncanonical layer" in caplog.text
 
 
 def test_unparseable_json_is_skipped_not_raised(tmp_path):
     (tmp_path / "broken.json").write_text("{not json")
-    (tmp_path / "ok.json").write_text(json.dumps({"events": []}))
+    from conftest import canonical_shell
+
+    (tmp_path / "ok.json").write_text(json.dumps(canonical_shell()))
     assert FileBackend(tmp_path).list_layer_ids() == ["ok"]
 
 

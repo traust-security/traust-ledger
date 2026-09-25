@@ -35,13 +35,18 @@ class TestP18AtomicMutate:
         writer = LedgerWriter(backend=backend)
         layer_path = tmp_path / "layer.json"
 
+        from conftest import canonical_shell
+
+        backend.initialize(layer_path, canonical_shell())
         backend.mutate = MagicMock(wraps=backend.mutate)  # type: ignore[method-assign]
         backend.load = MagicMock(wraps=backend.load)  # type: ignore[method-assign]
         backend.store = MagicMock(wraps=backend.store)  # type: ignore[method-assign]
 
         event = {
-            "source": {"ref": "test", "actor": {"kind": "machine"}},
+            "source": {"type": "triage_report", "ref": "test", "actor": {"kind": "machine"}},
             "finding_ref": "FIND-001",
+            "recorded_at": "2026-09-22T12:00:00Z",
+            "rationale": "Reviewed the finding against the implementation.",
             "disposition": {"validity": "confirmed", "resolution": "open"},
         }
         writer.append_event(layer_path, event)
@@ -61,21 +66,37 @@ def test_postgres_concurrent_mutate_preserves_both_appends() -> None:
     backend = DbBackend(engine)
     layer_id = f"concurrency-{uuid.uuid4().hex}"
     layer_path = Path(layer_id)
+    from conftest import canonical_shell
+
+    backend.initialize(layer_path, canonical_shell())
     barrier = Barrier(2)
 
     def append(event_id: str) -> None:
         barrier.wait()
 
         def mutate(layer: dict) -> None:
-            layer.setdefault("events", []).append({"event_id": event_id})
+            layer.setdefault("events", []).append(
+                {
+                    "event_id": event_id,
+                    "finding_ref": "FIND-001",
+                    "recorded_at": "2026-09-22T12:00:00Z",
+                    "source": {
+                        "type": "triage_report",
+                        "ref": f"source:{event_id}",
+                        "actor": {"kind": "machine"},
+                    },
+                    "disposition": {"validity": "confirmed", "resolution": "open"},
+                    "rationale": "Reviewed the evidence and confirmed the finding.",
+                }
+            )
 
         backend.mutate(layer_path, mutate)
 
     with ThreadPoolExecutor(max_workers=2) as pool:
-        list(pool.map(append, ("event-a", "event-b")))
+        list(pool.map(append, ("a" * 64, "b" * 64)))
     assert {event["event_id"] for event in backend.load(layer_path)["events"]} == {
-        "event-a",
-        "event-b",
+        "a" * 64,
+        "b" * 64,
     }
 
 
@@ -88,7 +109,28 @@ def test_postgres_guards_and_role_matrix() -> None:
     DbBackend.create_tables(engine)
     backend = DbBackend(engine)
     layer_id = f"guard-{uuid.uuid4().hex}"
-    backend.import_layer(layer_id, {"metadata": {}, "events": [{"event_id": "event-a"}]})
+    from conftest import canonical_shell
+
+    backend.import_layer(
+        layer_id,
+        {
+            **canonical_shell(),
+            "events": [
+                {
+                    "event_id": "a" * 64,
+                    "finding_ref": "FIND-001",
+                    "recorded_at": "2026-09-22T12:00:00Z",
+                    "source": {
+                        "type": "triage_report",
+                        "ref": "source:a",
+                        "actor": {"kind": "machine"},
+                    },
+                    "disposition": {"validity": "confirmed", "resolution": "open"},
+                    "rationale": "Reviewed the evidence and confirmed the finding.",
+                }
+            ],
+        },
+    )
 
     for statement in (
         "UPDATE traust_ledger.events SET event_id = 'changed' WHERE layer_id = :layer_id",
@@ -191,6 +233,9 @@ class TestWriterServiceErrors:
     def test_identity_rule_raises_identity_unverified(self, tmp_path: Path) -> None:
         writer = LedgerWriter()
         layer_path = tmp_path / "layer.json"
+        from conftest import canonical_shell
+
+        writer.backend.initialize(layer_path, canonical_shell())
         event = {
             "source": {
                 "ref": "test",
@@ -209,6 +254,9 @@ class TestWriterServiceErrors:
     def test_event_id_mismatch_raises_service_error(self, tmp_path: Path) -> None:
         writer = LedgerWriter()
         layer_path = tmp_path / "layer.json"
+        from conftest import canonical_shell
+
+        writer.backend.initialize(layer_path, canonical_shell())
         event = {
             "event_id": "not-the-canonical-id",
             "source": {"ref": "test", "actor": {"kind": "machine"}},

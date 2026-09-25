@@ -75,7 +75,11 @@ def _app_with_actor(tmp_path: Path, actor: LayerActor) -> FastAPI:
         data_dir=str(tmp_path),
         signing_required=False,
     )
-    return create_app(config, verifier=_FixedActorVerifier(actor))
+    from conftest import canonical_shell
+
+    app = create_app(config, verifier=_FixedActorVerifier(actor))
+    app.state.backend.initialize(tmp_path / f"{LAYER_ID}.json", canonical_shell())
+    return app
 
 
 def _countersign_body(**overrides: object) -> dict[str, object]:
@@ -366,10 +370,12 @@ def test_two_person_rule_fp_reassertion_rejected(tmp_path: Path) -> None:
 
     layer_path = layer_file_path(str(tmp_path), LAYER_ID)
     layer_path.parent.mkdir(parents=True, exist_ok=True)
+    from conftest import canonical_shell
+
     exec_confirmed = {
         "events": [
             {
-                "event_id": "exec-001",
+                "event_id": "a" * 64,
                 "finding_ref": "FIND-001",
                 "recorded_at": "2026-01-15T00:00:00+00:00",
                 "source": {
@@ -381,7 +387,8 @@ def test_two_person_rule_fp_reassertion_rejected(tmp_path: Path) -> None:
                 "rationale": "Exploit reproduced.",
             }
         ],
-        "metadata": {"merkle_epoch": 0},
+        "metadata": {**canonical_shell()["metadata"], "merkle_epoch": 0},
+        "needs_review": [],
     }
     stamp_merkle_metadata(exec_confirmed)
     layer_path.write_text(json.dumps(exec_confirmed))
@@ -414,13 +421,16 @@ def test_timestamp_future_rejected(client: TestClient) -> None:
 
 
 def test_epoch_truncation_rejected(client: TestClient, app_with_backend) -> None:
+    from conftest import canonical_shell
+
     layer_path = layer_file_path(app_with_backend.state.config.data_dir, LAYER_ID)
     layer_path.parent.mkdir(parents=True, exist_ok=True)
     layer_path.write_text(
         json.dumps(
             {
                 "events": [{"event_id": "seed-event", "finding_ref": "FIND-SEED"}],
-                "metadata": {"merkle_epoch": 99},
+                "metadata": {**canonical_shell()["metadata"], "merkle_epoch": 99},
+                "needs_review": [],
             },
         ),
     )
@@ -477,6 +487,9 @@ def test_actor_resolution_distinct_identities(tmp_path: Path) -> None:
         signing_required=False,
     )
     app = create_app(config, verifier=TokenActorVerifier())
+    from conftest import canonical_shell
+
+    app.state.backend.initialize(tmp_path / f"{LAYER_ID}.json", canonical_shell())
     app.state.resolver = ActorResolver(TokenActorVerifier(), None)
     client = TestClient(app)
     client.post(

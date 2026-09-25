@@ -5,6 +5,7 @@ import re
 
 from traust_contracts.v1.models.layer import LayerActor
 
+from traust_ledger._internal.backends.errors import LayerStorageError
 from traust_ledger._internal.errors import EventIdMismatchError as _InternalEventIdMismatchError
 from traust_ledger._internal.event_fields import (
     client_actor,
@@ -211,6 +212,7 @@ def submit_event(
         incoming_validity = ""
         if event_kind in BIRTH_EVENT_KINDS:
             event_payload = _stamp_actor_on_event(raw_event, stamped)
+            event_payload.pop("layer_id", None)  # routing key is not part of layer.schema.json
         elif event_kind == EventKind.SEVERITY:
             level = event_text(raw_event, EVENT_KEY_SEVERITY)
             if not level:
@@ -245,6 +247,8 @@ def submit_event(
         )
     except _InternalEventIdMismatchError as exc:
         raise EventIdMismatchError(supplied=exc.supplied, canonical=exc.canonical) from exc
+    except LayerStorageError as exc:
+        raise ValidationError(detail=str(exc)) from exc
     except ServiceError as exc:
         gate = getattr(exc, "gate", None)
         if gate is None:

@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
 import pytest
-from conftest import AUTH_HEADER, LAYER_ID, TEST_ISSUER
+from conftest import AUTH_HEADER, LAYER_ID, TEST_ISSUER, canonical_shell
 from fastapi.testclient import TestClient
 from pytest_httpserver import HTTPServer
 
@@ -47,7 +48,11 @@ def _make_event(
 
 
 def _layer_with_events(events: list[dict]) -> dict:
-    layer = {"events": events, "metadata": {"merkle_epoch": 0}}
+    layer = {**canonical_shell(), "events": events}
+    for event in events:
+        event["event_id"] = hashlib.sha256(event["event_id"].encode()).hexdigest()
+        event["rationale"] = "Reviewed supporting evidence and source."
+    layer["metadata"]["merkle_epoch"] = 0
     stamp_merkle_metadata(layer)
     return layer
 

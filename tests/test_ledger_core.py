@@ -20,6 +20,17 @@ from traust_ledger._internal.writer import LedgerWriter
 # for deletion.
 
 
+def _valid_event(event: dict) -> dict:
+    source = event["source"]
+    kind = source["actor"]["kind"]
+    return {
+        **event,
+        "source": {"type": "interactive" if kind == "human" else "triage_report", **source},
+        "recorded_at": "2026-09-22T12:00:00Z",
+        "rationale": "Reviewed and confirmed this finding against source.",
+    }
+
+
 class TestLedgerWriterIdempotency:
     """Test LedgerWriter idempotency."""
 
@@ -28,6 +39,9 @@ class TestLedgerWriterIdempotency:
         with tempfile.TemporaryDirectory() as tmpdir:
             layer_path = Path(tmpdir) / "layer.json"
             writer = LedgerWriter()
+            from conftest import canonical_shell
+
+            writer.backend.initialize(layer_path, canonical_shell())
 
             event = {
                 "source": {"ref": "test", "actor": {"kind": "machine"}},
@@ -35,8 +49,8 @@ class TestLedgerWriterIdempotency:
                 "disposition": {"validity": "confirmed", "resolution": "open"},
             }
 
-            id1 = writer.append_event(layer_path, event.copy())
-            id2 = writer.append_event(layer_path, event.copy())
+            id1 = writer.append_event(layer_path, _valid_event(event.copy()))
+            id2 = writer.append_event(layer_path, _valid_event(event.copy()))
 
             assert id1 == id2
 
@@ -49,6 +63,9 @@ class TestLedgerWriterIdempotency:
         with tempfile.TemporaryDirectory() as tmpdir:
             layer_path = Path(tmpdir) / "layer.json"
             writer = LedgerWriter()
+            from conftest import canonical_shell
+
+            writer.backend.initialize(layer_path, canonical_shell())
 
             event1 = {
                 "source": {"ref": "test1", "actor": {"kind": "machine"}},
@@ -56,7 +73,7 @@ class TestLedgerWriterIdempotency:
                 "disposition": {"validity": "confirmed", "resolution": "open"},
             }
 
-            writer.append_event(layer_path, event1)
+            writer.append_event(layer_path, _valid_event(event1))
             layer = json.loads(layer_path.read_text())
             assert len(layer["events"]) == 1
 
@@ -66,7 +83,7 @@ class TestLedgerWriterIdempotency:
                 "disposition": {"validity": "confirmed", "resolution": "open"},
             }
 
-            writer.append_event(layer_path, event2)
+            writer.append_event(layer_path, _valid_event(event2))
             layer_reloaded = json.loads(layer_path.read_text())
             assert len(layer_reloaded["events"]) == 2
 
@@ -79,6 +96,9 @@ class TestLedgerWriterLDAPRule:
         with tempfile.TemporaryDirectory() as tmpdir:
             layer_path = Path(tmpdir) / "layer.json"
             writer = LedgerWriter()
+            from conftest import canonical_shell
+
+            writer.backend.initialize(layer_path, canonical_shell())
 
             event = {
                 "source": {
@@ -94,13 +114,16 @@ class TestLedgerWriterLDAPRule:
             }
 
             with pytest.raises(Exception, match="verified identity"):
-                writer.append_event(layer_path, event)
+                writer.append_event(layer_path, _valid_event(event))
 
     def test_human_false_positive_with_verified_identity_succeeds(self):
         """Human false_positive with verified identity succeeds."""
         with tempfile.TemporaryDirectory() as tmpdir:
             layer_path = Path(tmpdir) / "layer.json"
             writer = LedgerWriter()
+            from conftest import canonical_shell
+
+            writer.backend.initialize(layer_path, canonical_shell())
 
             event = {
                 "source": {
@@ -115,7 +138,7 @@ class TestLedgerWriterLDAPRule:
                 "disposition": {"validity": "false_positive", "resolution": "open"},
             }
 
-            event_id = writer.append_event(layer_path, event)
+            event_id = writer.append_event(layer_path, _valid_event(event))
             assert event_id
 
             layer = json.loads(layer_path.read_text())
@@ -126,6 +149,9 @@ class TestLedgerWriterLDAPRule:
         with tempfile.TemporaryDirectory() as tmpdir:
             layer_path = Path(tmpdir) / "layer.json"
             writer = LedgerWriter()
+            from conftest import canonical_shell
+
+            writer.backend.initialize(layer_path, canonical_shell())
 
             event = {
                 "source": {
@@ -140,7 +166,7 @@ class TestLedgerWriterLDAPRule:
                 "disposition": {"validity": "false_positive", "resolution": "open"},
             }
 
-            event_id = writer.append_event(layer_path, event)
+            event_id = writer.append_event(layer_path, _valid_event(event))
             assert event_id
 
     def test_machine_false_positive_no_ldap_required(self):
@@ -148,6 +174,9 @@ class TestLedgerWriterLDAPRule:
         with tempfile.TemporaryDirectory() as tmpdir:
             layer_path = Path(tmpdir) / "layer.json"
             writer = LedgerWriter()
+            from conftest import canonical_shell
+
+            writer.backend.initialize(layer_path, canonical_shell())
 
             event = {
                 "source": {"ref": "test", "actor": {"kind": "machine"}},
@@ -155,7 +184,7 @@ class TestLedgerWriterLDAPRule:
                 "disposition": {"validity": "false_positive", "resolution": "open"},
             }
 
-            event_id = writer.append_event(layer_path, event)
+            event_id = writer.append_event(layer_path, _valid_event(event))
             assert event_id
 
             layer = json.loads(layer_path.read_text())

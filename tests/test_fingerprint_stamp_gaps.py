@@ -52,7 +52,12 @@ def _app(tmp_path: Path, actor: LayerActor | None = None) -> FastAPI:
         data_dir=str(tmp_path),
         signing_required=False,
     )
-    return create_app(config, verifier=_FixedActorVerifier(actor or _verified_human()))
+    from conftest import canonical_shell
+
+    app = create_app(config, verifier=_FixedActorVerifier(actor or _verified_human()))
+    if not (tmp_path / f"{LAYER_ID}.json").exists():
+        app.state.backend.initialize(tmp_path / f"{LAYER_ID}.json", canonical_shell())
+    return app
 
 
 def _read_layer_events(tmp_path: Path, layer_id: str = LAYER_ID) -> list[dict]:
@@ -70,13 +75,15 @@ def _seed_birth_event(tmp_path: Path, layer_id: str = LAYER_ID) -> None:
     The countersign path needs an existing layer with at least one event
     (for the two-person gate to have something to check against).
     """
+    from conftest import canonical_shell
+
     from traust_ledger._internal.integrity import stamp_merkle_metadata
 
     fp = "aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44"
     layer = {
         "events": [
             {
-                "event_id": "birth-001",
+                "event_id": "a" * 64,
                 "finding_ref": "FIND-001",
                 "recorded_at": "2026-01-15T00:00:00+00:00",
                 "source": {
@@ -87,9 +94,11 @@ def _seed_birth_event(tmp_path: Path, layer_id: str = LAYER_ID) -> None:
                 "disposition": {"validity": "confirmed"},
                 "fingerprint": fp,
                 "fingerprint_algo": ALGO_VERSION,
+                "rationale": "Reviewed execution evidence and reproduced this finding.",
             }
         ],
-        "metadata": {"merkle_epoch": 0},
+        "metadata": {**canonical_shell()["metadata"], "merkle_epoch": 0},
+        "needs_review": [],
     }
     stamp_merkle_metadata(layer)
     path = layer_file_path(str(tmp_path), layer_id)
@@ -181,6 +190,11 @@ def test_cli_submit_stamps_fingerprint_algo(tmp_path: Path, monkeypatch) -> None
     monkeypatch.setenv("LEDGER_TOKEN", "fake-jwt-for-test")
 
     fp = "cc33dd44ee55ff66aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44ee55ff66"
+    from conftest import canonical_shell
+
+    from traust_ledger._internal.backends.file import FileBackend
+
+    FileBackend().initialize(tmp_path / f"{LAYER_ID}.json", canonical_shell())
     events_file = tmp_path / "events.json"
     events_file.write_text(
         json.dumps(
@@ -188,9 +202,10 @@ def test_cli_submit_stamps_fingerprint_algo(tmp_path: Path, monkeypatch) -> None
                 {
                     "finding_ref": "FIND-003",
                     "disposition": {"validity": "confirmed"},
-                    "source": {"ref": "scan-001", "actor": {}},
+                    "source": {"type": "triage_report", "ref": "scan-001", "actor": {}},
                     "recorded_at": RECORDED_AT,
                     "fingerprint": fp,
+                    "rationale": "Reviewed dependency scanner evidence for this finding.",
                 }
             ]
         )

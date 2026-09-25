@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 
-from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+from jsonschema import Draft202012Validator, FormatChecker
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from traust_contracts.paths import schema_path
@@ -60,22 +60,9 @@ def _validate(layer: SourceLayer, signature_key: str | None = None) -> int:
     errors = sorted(
         _layer_validator().iter_errors(layer.document), key=lambda item: list(item.path)
     )
-    blocking: list[ValidationError] = []
     warnings = 0
-    for error in errors:
-        path = list(error.absolute_path)
-        legacy_review_extension = (
-            error.validator == "additionalProperties"
-            and len(path) >= 2
-            and path[0] == "needs_review"
-            and isinstance(path[1], int)
-        )
-        if legacy_review_extension:
-            warnings += 1
-        else:
-            blocking.append(error)
-    if blocking:
-        error = blocking[0]
+    if errors:
+        error = errors[0]
         path = "/".join(str(token) for token in error.absolute_path)
         raise ValueError(
             f"{layer.source}: schema rule {error.validator} failed at /{path}"
@@ -106,6 +93,72 @@ def iter_directory_layers(directory: Path) -> Iterator[SourceLayer]:
         if not isinstance(document.get("events"), list):
             continue
         yield SourceLayer(layer_id=path.stem, document=document, source=str(path))
+
+
+def iter_manifest_layers(directory: Path, manifest: Path) -> Iterator[SourceLayer]:
+    """Read explicitly routed Ledger files without interpreting directory layout."""
+    root = directory.resolve(strict=True)
+    selected: list[tuple[str, Path, str]] = []
+    identities: set[str] = set()
+    paths: set[str] = set()
+    with manifest.open(encoding="utf-8") as stream:
+        for line_number, line in enumerate(stream, 1):
+            record = json.loads(line)
+            if not isinstance(record, dict):
+                raise ValueError(f"Invalid selection at manifest line {line_number}")
+            if record.get("namespace") != "traust_ledger" or record.get("decision") not in {
+                "selected",
+                "delegated",
+            }:
+                continue
+            relative = record.get("source_file")
+            layer_id = record.get("layer_id")
+            digest = record.get("source_digest")
+            if (
+                record.get("format_version") != 1
+                or record.get("artifact") != "layer"
+                or not isinstance(relative, str)
+                or not relative
+                or Path(relative).is_absolute()
+                or ".." in Path(relative).parts
+                or "\\" in relative
+                or not relative.endswith(".json")
+                or not isinstance(layer_id, str)
+                or not layer_id
+                or not isinstance(digest, str)
+                or len(digest) != 64
+                or any(char not in "0123456789abcdef" for char in digest)
+            ):
+                raise ValueError(f"Invalid Ledger selection at manifest line {line_number}")
+            if layer_id in identities or relative in paths:
+                raise ValueError(f"Duplicate Ledger selection at manifest line {line_number}")
+            identities.add(layer_id)
+            paths.add(relative)
+            selected.append((layer_id, root / relative, digest))
+    if not selected:
+        raise ValueError("No selected Ledger layers in manifest")
+    for layer_id, path, digest in selected:
+        source = str(path)
+        current = root
+        for part in path.relative_to(root).parts:
+            current /= part
+            if current.is_symlink():
+                yield SourceLayer(layer_id, {}, source, "symlink alias is not a source file")
+                break
+        else:
+            if not path.resolve().is_relative_to(root):
+                yield SourceLayer(layer_id, {}, source, "path escapes source directory")
+                continue
+            try:
+                payload = path.read_bytes()
+                if hashlib.sha256(payload).hexdigest() != digest:
+                    yield SourceLayer(layer_id, {}, source, "source digest changed since selection")
+                    continue
+                document = _document(payload, source)
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+                yield SourceLayer(layer_id, {}, source, f"invalid layer document: {error}")
+                continue
+            yield SourceLayer(layer_id, document, source)
 
 
 def iter_ledger_layers(engine: Engine) -> Iterator[SourceLayer]:

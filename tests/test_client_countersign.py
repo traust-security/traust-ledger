@@ -36,7 +36,9 @@ def _client(tmp_path: Path) -> LedgerClient:
 
 def _seed(tmp_path: Path) -> None:
     path = layer_file_path(str(tmp_path), LAYER_ID)
-    FileBackend(data_dir=tmp_path).store(path, {"events": [], "metadata": {}})
+    from conftest import canonical_shell
+
+    FileBackend(data_dir=tmp_path).initialize(path, canonical_shell())
 
 
 def _reload(tmp_path: Path) -> dict:

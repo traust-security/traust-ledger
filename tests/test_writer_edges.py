@@ -27,6 +27,9 @@ class _LoadStoreBackend:
 class TestSchemaValidation:
     def test_invalid_schema_path_raises(self, tmp_path: Path) -> None:
         writer = LedgerWriter(schema_path=tmp_path / "missing.json")
+        from conftest import canonical_shell
+
+        writer.backend.initialize(tmp_path / "layer.json", canonical_shell())
         with pytest.raises(ValueError, match="Failed to load schema"):
             writer.append_event(tmp_path / "layer.json", _minimal_event())
 
@@ -47,7 +50,9 @@ class TestSchemaValidation:
         )
         writer = LedgerWriter(schema_path=schema_path)
         layer_path = tmp_path / "layer.json"
-        layer_path.write_text(json.dumps({"events": []}), encoding="utf-8")
+        from conftest import canonical_shell
+
+        layer_path.write_text(json.dumps(canonical_shell()), encoding="utf-8")
         with pytest.raises(ValueError, match="Layer validation failed"):
             writer.append_event(layer_path, _minimal_event())
 

@@ -17,6 +17,11 @@ def register_migrate_parser(subparsers: argparse._SubParsersAction) -> None:
     parser = subparsers.add_parser("migrate", help="Migrate complete historical layers")
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--source-dir", type=Path, help="Ledger data directory")
+    parser.add_argument(
+        "--selection-manifest",
+        type=Path,
+        help="decisions.jsonl from artifact preview; requires --source-dir",
+    )
     source.add_argument(
         "--source-database-url",
         help="artifact storage SQLAlchemy URL; prefer LAAS_MIGRATION_SOURCE_URL for credentials",
@@ -60,6 +65,7 @@ def cmd_migrate(args: argparse.Namespace) -> int:
         iter_artifact_layers,
         iter_directory_layers,
         iter_ledger_layers,
+        iter_manifest_layers,
         migrate,
     )
     from traust_ledger._internal.migrations import DatabaseRoles
@@ -79,8 +85,14 @@ def cmd_migrate(args: argparse.Namespace) -> int:
     if args.target_database_url and "@" in args.target_database_url:
         raise SystemExit("target URL contains credentials; use LAAS_MIGRATION_TARGET_URL")
 
+    if args.selection_manifest is not None and args.source_dir is None:
+        raise SystemExit("--selection-manifest requires --source-dir")
     if args.source_dir is not None:
-        layers = iter_directory_layers(args.source_dir)
+        layers = (
+            iter(list(iter_manifest_layers(args.source_dir, args.selection_manifest)))
+            if args.selection_manifest is not None
+            else iter_directory_layers(args.source_dir)
+        )
         source_name = str(args.source_dir)
     else:
         if not source_url:

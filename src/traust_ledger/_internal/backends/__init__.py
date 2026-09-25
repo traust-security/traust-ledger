@@ -24,6 +24,10 @@ class Backend(Protocol):
         """Load a layer from storage."""
         ...
 
+    def initialize(self, path: Path, data: dict) -> None:
+        """Create a complete layer without replacing an existing one."""
+        ...
+
     def store(self, path: Path, data: dict) -> None:
         """Persist a layer to storage."""
         ...

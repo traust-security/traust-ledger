@@ -113,7 +113,11 @@ def auth_client(tmp_path, httpserver: HTTPServer, rsa_keypair, jwks_json):
         oidc_issuer=TEST_ISSUER,
         oidc_jwks_url=jwks_url,
     )
-    return TestClient(create_app(config))
+    from conftest import canonical_shell
+
+    app = create_app(config)
+    app.state.backend.initialize(tmp_path / f"{LAYER}.json", canonical_shell())
+    return TestClient(app)
 
 
 def _severity_event(layer_id=LAYER):
@@ -259,6 +263,9 @@ def test_oidc_plus_ldap_cross_check(
         oidc_jwks_url=jwks_url,
     )
     app = create_app(config)
+    from conftest import canonical_shell
+
+    app.state.backend.initialize(tmp_path / f"{LAYER}.json", canonical_shell())
     app.state.resolver._directory = _FakeDirectory(active=True)
     client = TestClient(app)
 
@@ -302,6 +309,9 @@ def test_oidc_ldap_not_found_rejected(
         oidc_jwks_url=jwks_url,
     )
     app = create_app(config)
+    from conftest import canonical_shell
+
+    app.state.backend.initialize(tmp_path / f"{LAYER}.json", canonical_shell())
     app.state.resolver._directory = _FakeDirectory(active=False)
     client = TestClient(app)
 

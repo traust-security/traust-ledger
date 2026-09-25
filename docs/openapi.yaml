@@ -87,6 +87,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorDetail'
+  /v1/ledger/layers/{layer_id}/initialize:
+    post:
+      summary: Post Initialize Layer
+      operationId: post_initialize_layer_v1_ledger_layers__layer_id__initialize_post
+      parameters:
+      - name: layer_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Layer Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              title: Shell
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                title: Response Post Initialize Layer V1 Ledger Layers  Layer Id  Initialize
+                  Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v1/ledger/layers/{layer_id}:
     get:
       summary: Get Layer

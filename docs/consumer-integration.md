@@ -71,7 +71,8 @@ For services that run traust-ledger in the same environment:
 | `ledger submit <events.json>` | Submit events (same as REST batch) |
 | `ledger countersign <finding_ref>` | Two-person countersign |
 | `ledger fingerprint <report.json>` | Stamp fingerprints on a report |
-| `ledger migrate --source-dir <dir>` | Migrate trusted historical layer files |
+| `ledger migrate --source-dir <dir>` | Migrate flat historical layer files (filename stem is ID) |
+| `ledger migrate --source-dir <dir> --selection-manifest <file>` | Migrate selected nested layer files with pinned identities |
 | `ledger migrate --source-database-url <url>` | Migrate complete layer artifact evidence |
 | `ledger migrate --source-ledger-database-url <url>` | Copy normalized SQLite/PostgreSQL Ledger state |
 | `ledger materialize --to <url>` | Rebuild the queryable findings projection |
@@ -92,6 +93,12 @@ export LAAS_MIGRATION_TARGET_URL=postgresql://user:pass@host/database
 ledger migrate --source-dir /path/to/ledger-data --dry-run
 ledger migrate --source-dir /path/to/ledger-data
 
+# Nested findings tree: preview the same root with traust corpus migrate-artifacts plan
+ledger migrate --source-dir /path/to/analysis-results/findings \
+  --selection-manifest /path/to/preview/decisions.jsonl --dry-run
+ledger migrate --source-dir /path/to/analysis-results/findings \
+  --selection-manifest /path/to/preview/decisions.jsonl
+
 # Complete evidence already stored by artifact migration
 export LAAS_MIGRATION_SOURCE_URL=postgresql://user:pass@host/database
 ledger migrate --source-database-url from-env
@@ -104,6 +111,11 @@ ledger migrate --source-ledger-database-url from-env
 ledger migrate --source-dir /path/to/ledger-data --layer layer-a --json
 ```
 
+`--selection-manifest` accepts version 1 receipts from artifact preview; it uses
+only `traust_ledger` layer decisions, verifies the original SHA-256 and rejects
+unsafe paths, symlink aliases, or duplicate layer IDs before importing. Use the
+same source root for preview and migration. Without the manifest, `--source-dir`
+retains its flat-directory and filename-stem identity behavior.
 `--source-database-url from-env` selects database evidence while the real URL
 comes from `LAAS_MIGRATION_SOURCE_URL`; `LAAS_MIGRATION_TARGET_URL` always names
 the normalized Ledger destination. Migration validates complete layer documents,

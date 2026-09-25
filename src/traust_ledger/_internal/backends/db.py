@@ -13,8 +13,9 @@ from sqlalchemy.engine import Connection, Engine
 from traust_ledger._internal.migrations import ledger_tables, upgrade
 
 from .constants import EMPTY_LAYER
-from .errors import LayerConflictError
+from .errors import LayerConflictError, LayerNotInitializedError
 from .records import LayerRecord, StoredLayerRecord
+from .validation import validate_layer
 
 T = TypeVar("T")
 
@@ -50,9 +51,12 @@ class DbBackend:
         """Load by domain identity without applying filesystem path rules."""
         with self._engine.connect() as conn:
             layer = self._load(conn, layer_id)
+        if layer is not None:
+            validate_layer(layer)
         return deepcopy(layer) if layer is not None else deepcopy(EMPTY_LAYER)
 
     def store(self, path: Path, data: dict) -> None:
+        validate_layer(data)
         layer_id = _layer_id(path)
         with self._engine.begin() as conn:
             self._lock_layer(conn, layer_id)
@@ -62,13 +66,19 @@ class DbBackend:
         layer_id = _layer_id(path)
         with self._engine.begin() as conn:
             self._lock_layer(conn, layer_id)
-            data = self._load(conn, layer_id, for_update=True) or deepcopy(EMPTY_LAYER)
+            data = self._load(conn, layer_id, for_update=True)
+            if data is None:
+                raise LayerNotInitializedError(
+                    f"layer {layer_id!r} is not initialized; provide a complete layer shell"
+                )
             result = mutator(data)
+            validate_layer(data)
             self._persist(conn, layer_id, LayerRecord.from_document(data))
             return result
 
     def import_layer(self, layer_id: str, data: dict, *, dry_run: bool = False) -> str:
         """Insert immutable history, accepting only exact idempotent migrations."""
+        validate_layer(data)
         record = LayerRecord.from_document(data)
         with self._engine.begin() as conn:
             self._lock_layer(conn, layer_id)
@@ -80,9 +90,21 @@ class DbBackend:
             if dry_run:
                 return "would_insert"
             self._persist(conn, layer_id, record)
-            if self._load(conn, layer_id) != data:
+            reconstructed = self._load(conn, layer_id)
+            if reconstructed != data:
                 raise RuntimeError(f"layer {layer_id!r} failed reconstruction verification")
+            validate_layer(reconstructed)
             return "inserted"
+
+    def initialize(self, path: Path, data: dict) -> None:
+        """Create one complete layer atomically; never replace an existing layer."""
+        validate_layer(data)
+        layer_id = _layer_id(path)
+        with self._engine.begin() as conn:
+            self._lock_layer(conn, layer_id)
+            if self._has_layer(conn, layer_id):
+                raise LayerConflictError(f"layer {layer_id!r} already exists")
+            self._persist(conn, layer_id, LayerRecord.from_document(data))
 
     @staticmethod
     def _lock_layer(conn: Connection, layer_id: str) -> None:
