@@ -2,6 +2,14 @@
 
 All notable changes to traust-ledger are documented here.
 
+## [0.8.4]
+
+### Changed
+
+- traust-contracts v0.46.0 (OWASP risk ratings in the storage `threat`
+  table). The ledger doesn't read threats; the bump keeps one contracts ref
+  across the release train.
+
 ## [0.8.3]
 
 ### Changed
