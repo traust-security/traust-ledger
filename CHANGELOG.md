@@ -2,6 +2,14 @@
 
 All notable changes to traust-ledger are documented here.
 
+## [0.9.1]
+
+### Changed
+
+- Pin `traust-contracts` by tag `v0.48.0` (floor `>=0.48.0`). That release adds
+  storage binding roles and `artifact_location`; nothing in the ledger reads
+  storage bindings, so there is no behaviour change here.
+
 ## [0.9.0]
 
 ### Security
