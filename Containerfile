@@ -74,7 +74,7 @@ RUN uv pip install "psycopg[binary]>=${PSYCOPG_VERSION}"
 # ── cosign source ───────────────────────────────────────────────────
 # Take the cosign binary from a digest-pinned hardened image rather than
 # downloading a release at build time: no network fetch in the build.
-FROM registry.access.redhat.com/hi/cosign:latest@sha256:a8f2e8fc26dd0ca7cfa5adfdd4bea734ffcdfdcc71da29930068524d66781e0d AS cosign
+FROM registry.access.redhat.com/hi/cosign:latest@sha256:d9435248a2340d32e58fe21b3fff5f8a0b46710d9765c08c23ba4d99f345974e AS cosign
 
 # ── Runtime stage ───────────────────────────────────────────────────
 # Minimal hardened Python runtime. Runs as a non-root user (UID 1001) by
