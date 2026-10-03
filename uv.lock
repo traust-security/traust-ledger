@@ -1388,8 +1388,8 @@ wheels = [
 
 [[package]]
 name = "traust-contracts"
-version = "0.47.0"
-source = { git = "https://github.com/traust-security/traust-contracts.git?tag=v0.47.0#c1c22165f30287c3b83e56a1830d275a1a14bc41" }
+version = "0.48.1"
+source = { git = "https://github.com/traust-security/traust-contracts.git?tag=v0.48.1#1660eda596d0f43e764670aa577a3633a59ac9b9" }
 dependencies = [
     { name = "jsonschema", extra = ["format-nongpl"] },
     { name = "pydantic" },
@@ -1446,7 +1446,7 @@ requires-dist = [
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.8" },
     { name = "sqlalchemy", marker = "extra == 'db'", specifier = ">=2.0" },
     { name = "sqlalchemy", marker = "extra == 'service'", specifier = ">=2.0" },
-    { name = "traust-contracts", git = "https://github.com/traust-security/traust-contracts.git?tag=v0.47.0" },
+    { name = "traust-contracts", git = "https://github.com/traust-security/traust-contracts.git?tag=v0.48.1" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'service'", specifier = ">=0.30" },
 ]
 provides-extras = ["db", "service", "cli"]
