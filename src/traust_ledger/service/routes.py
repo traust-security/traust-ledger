@@ -193,7 +193,7 @@ async def get_layer(layer_id: str, request: Request) -> dict[str, object]:
 
 
 @router.get(
-    "/v1/ledger/layers/{layer_id}/verify",
+    "/v1/ledger/layers/{layer_id:path}/verify",
     response_model=VerifyResponse,
     dependencies=[Depends(require_identity)],
     responses={
@@ -214,7 +214,7 @@ async def verify_layer_endpoint(
 
 
 @router.get(
-    "/v1/ledger/layers/{layer_id}/findings",
+    "/v1/ledger/layers/{layer_id:path}/findings",
     response_model=FindingsResponse,
     dependencies=[Depends(require_identity)],
     responses={
@@ -228,7 +228,7 @@ async def get_findings(layer_id: str, request: Request) -> FindingsResponse:
 
 
 @router.get(
-    "/v1/ledger/layers/{layer_id}/cumulative",
+    "/v1/ledger/layers/{layer_id:path}/cumulative",
     response_model=FindingsResponse,
     dependencies=[Depends(require_identity)],
     responses={
@@ -243,7 +243,7 @@ async def get_cumulative(layer_id: str, request: Request) -> FindingsResponse:
 
 
 @router.get(
-    "/v1/ledger/layers/{layer_id}/events",
+    "/v1/ledger/layers/{layer_id:path}/events",
     response_model=EventsResponse,
     dependencies=[Depends(require_identity)],
     responses={

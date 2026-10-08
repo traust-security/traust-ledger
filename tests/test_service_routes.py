@@ -94,6 +94,48 @@ def _countersign_body(**overrides: object) -> dict[str, object]:
     return {"kind": "countersign", "contracts_version": CONTRACTS_VERSION, "event": event}
 
 
+def test_corpus_layer_read_routes_preserve_full_id(
+    client: TestClient, app_with_backend, monkeypatch
+) -> None:
+    from conftest import canonical_shell
+
+    from traust_ledger.service import routes
+
+    seen = []
+    layer_id = "corpus:layer:findings/product/repository/report"
+    shell = canonical_shell()
+
+    def load(identifier, backend, config):
+        seen.append(identifier)
+        return shell
+
+    monkeypatch.setattr(routes, "load_layer", load)
+    monkeypatch.setattr(
+        routes,
+        "resolve_findings",
+        lambda identifier, backend, config: (
+            seen.append(identifier)
+            or {
+                "layer_id": identifier,
+                "findings": [],
+                "summary": {"by_validity": {}, "by_resolution": {}},
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        routes,
+        "query_layer_events",
+        lambda identifier, backend, config, **kwargs: (
+            seen.append(identifier) or {"layer_id": identifier, "events": [], "total": 0}
+        ),
+    )
+    for suffix in ("events", "findings", "cumulative"):
+        response = client.get(f"/v1/ledger/layers/{layer_id}/{suffix}", headers=AUTH_HEADER)
+        assert response.status_code == 200, response.text
+        assert seen[-1] == layer_id
+        assert client.get(f"/v1/ledger/layers/{layer_id}/{suffix}").status_code == 401
+
+
 def test_healthz(client: TestClient) -> None:
     response = client.get(ROUTE_HEALTHZ)
     assert response.status_code == 200

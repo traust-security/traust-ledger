@@ -2,6 +2,13 @@
 
 All notable changes to traust-ledger are documented here.
 
+## [0.9.1]
+
+### Fixed
+
+- Read findings, cumulative state, events and verification for opaque corpus
+  layer IDs containing slashes without changing stored identities or auth gates.
+
 ## [0.9.0]
 
 ### Security
