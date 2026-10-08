@@ -94,6 +94,23 @@ def _countersign_body(**overrides: object) -> dict[str, object]:
     return {"kind": "countersign", "contracts_version": CONTRACTS_VERSION, "event": event}
 
 
+def test_database_layer_loader_does_not_convert_ids_to_file_paths(monkeypatch) -> None:
+    from conftest import canonical_shell
+
+    from traust_ledger._internal.backends.db import DbBackend
+    from traust_ledger.handlers.layer_handler import load_layer
+
+    seen = []
+    shell = canonical_shell()
+    backend = object.__new__(DbBackend)
+    monkeypatch.setattr(
+        DbBackend, "load_layer_id", lambda self, identity: seen.append(identity) or shell
+    )
+    identity = "corpus:layer:findings/product/repository/report"
+    assert load_layer(identity, backend, ServiceConfig(backend_type="db")) == shell
+    assert seen == [identity]
+
+
 def test_corpus_layer_read_routes_preserve_full_id(
     client: TestClient, app_with_backend, monkeypatch
 ) -> None:
