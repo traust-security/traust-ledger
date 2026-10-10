@@ -14,6 +14,7 @@ from storage_db import copy_registry, prepare_storage
 from traust_contracts.v1.ledger import CONTRACT_VERSION, REVISION, TABLE_ORDER
 
 from traust_ledger._internal.backends.db import DbBackend
+from traust_ledger._internal.backends.errors import LayerConflictError
 from traust_ledger._internal.historical_migration import (
     SourceLayer,
     iter_ledger_layers,
@@ -477,12 +478,12 @@ def test_import_requires_and_records_product_repo(tmp_path: Path) -> None:
     backend = DbBackend(engine)
     with pytest.raises(ValueError, match="product_repo_id is required"):
         backend.import_layer("layer-a", _layer())
-    with pytest.raises(DatabaseError, match="FOREIGN KEY"):
+    with pytest.raises(LayerConflictError, match="not registered in storage"):
         backend.import_layer("layer-a", _layer(), product_repo_id="unregistered")
     assert backend.import_layer("layer-a", _layer(), product_repo_id=owner) == "inserted"
     assert backend.product_repo_id("layer-a") == owner
     assert backend.import_layer("layer-a", _layer(), product_repo_id=owner) == "skipped"
     with pytest.raises(ValueError, match="different product_repo"):
         backend.import_layer("layer-a", _layer(), product_repo_id=other)
-    with pytest.raises(DatabaseError, match="UNIQUE"):
+    with pytest.raises(LayerConflictError, match="already has layer 'layer-a'"):
         backend.import_layer("layer-b", _layer(), product_repo_id=owner)

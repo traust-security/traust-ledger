@@ -24,8 +24,24 @@ All notable changes to traust-ledger are documented here.
   database layers bind the ID verbatim (printable, no surrounding whitespace,
   at most 512 characters). `POST /v1/ledger/events` accepts such IDs in the
   body, and bulk `GET /v1/ledger/findings` no longer fails on them.
+- **A second layer for one `product_repo` is a conflict, not a 500.**
+  `initialize` and `import_layer` now refuse an owner that already has a layer
+  (`LayerConflictError`, 422 over REST, naming the existing layer), and a
+  racing insert or an owner not registered in storage maps to the same
+  conflict instead of an unhandled `IntegrityError`. Dry-run imports report it
+  too.
 - Core installs (no `db` extra) still import `traust_ledger.client` without
   SQLAlchemy.
+
+### Notes
+
+- `POST /v1/ledger/layers/{layer_id}/initialize` has no query-addressed twin by
+  design: layers with `:`/`/` IDs arrive through the administrative importer,
+  never HTTP initialization.
+- **Client support follows in the Go SDK.** Existing SDK releases still splice
+  the layer ID into the path, so they cannot reach corpus-ID layers; the
+  companion SDK change moves every layer call to `/v1/ledger/layer…?layer_id=`.
+  Deploy this release before that SDK reaches SCI or the worker.
 
 ### Changed
 

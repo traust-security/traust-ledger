@@ -292,3 +292,44 @@ def test_product_repo_id_is_a_storage_uuid(tmp_path: Path, value: str) -> None:
         "/v1/ledger/layers/new-layer/initialize", json=_create(SHELL, value), headers=headers
     )
     assert created.status_code == 422
+
+
+def test_second_layer_for_one_product_repo_is_a_conflict_not_a_500(tmp_path: Path) -> None:
+    """One layer per product_repo surfaces as a client error on REST, SDK and import."""
+    database_url = f"sqlite:///{tmp_path / 'owner.db'}"
+    owner = prepare_storage(database_url)
+    config = ServiceConfig(
+        data_dir=str(tmp_path),
+        backend_type="db",
+        database_url=database_url,
+        signing_required=False,
+    )
+    client = TestClient(
+        create_app(config, verifier=TokenActorVerifier()), raise_server_exceptions=False
+    )
+    headers = {"Authorization": "Bearer alice"}
+    first = client.post(
+        "/v1/ledger/layers/first/initialize", json=_create(SHELL, owner), headers=headers
+    )
+    assert first.status_code == 200
+    second = client.post(
+        "/v1/ledger/layers/second/initialize", json=_create(SHELL, owner), headers=headers
+    )
+    assert second.status_code == 422, second.text
+    assert "already has layer 'first'" in second.json()["detail"]
+
+    unregistered = client.post(
+        "/v1/ledger/layers/orphan/initialize",
+        json=_create(SHELL, "00000000-0000-4000-8000-000000000000"),
+        headers=headers,
+    )
+    assert unregistered.status_code == 422, unregistered.text
+
+    backend = DbBackend(create_engine(database_url))
+    from traust_ledger._internal.backends.errors import LayerConflictError
+
+    with pytest.raises(LayerConflictError, match="already has layer 'first'"):
+        backend.import_layer("corpus:layer:other", SHELL, product_repo_id=owner)
+    with pytest.raises(LayerConflictError, match="already has layer 'first'"):
+        backend.import_layer("corpus:layer:other", SHELL, product_repo_id=owner, dry_run=True)
+    assert backend.list_layer_ids() == ["first"]
