@@ -25,7 +25,6 @@ from traust_ledger._internal.integrity import (
 from traust_ledger.config import ServiceConfig
 from traust_ledger.service.app import create_app
 
-CONTRACTS = "0.4.4"
 LAYER = "signed-smoke"
 RECORDED = "2026-08-18T15:00:00+00:00"
 RATIONALE = "Confirmed via manual code review and dynamic analysis"
@@ -34,7 +33,6 @@ RATIONALE = "Confirmed via manual code review and dynamic analysis"
 def _severity_event(layer_id: str = LAYER) -> dict:
     return {
         "kind": "severity",
-        "contracts_version": CONTRACTS,
         "event": {
             "layer_id": layer_id,
             "finding_ref": "VULN-001",
@@ -48,7 +46,6 @@ def _severity_event(layer_id: str = LAYER) -> dict:
 def _countersign(layer_id: str = LAYER) -> dict:
     return {
         "kind": "countersign",
-        "contracts_version": CONTRACTS,
         "event": {
             "layer_id": layer_id,
             "finding_ref": "VULN-001",

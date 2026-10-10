@@ -13,7 +13,6 @@ class InitializeRequest(BaseModel):
 
 class EventEnvelope(BaseModel):
     kind: str
-    contracts_version: str = ""
     event: dict[str, object]
 
 

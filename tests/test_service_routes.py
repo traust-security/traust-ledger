@@ -9,7 +9,6 @@ from pathlib import Path
 from auth_helpers import TokenActorVerifier
 from conftest import (
     AUTH_HEADER,
-    CONTRACTS_VERSION,
     LAYER_ID,
     RATIONALE_OK,
     RATIONALE_SHORT,
@@ -91,7 +90,7 @@ def _countersign_body(**overrides: object) -> dict[str, object]:
         "recorded_at": RECORDED_AT,
     }
     event.update(overrides)
-    return {"kind": "countersign", "contracts_version": CONTRACTS_VERSION, "event": event}
+    return {"kind": "countersign", "event": event}
 
 
 def test_database_layer_loader_does_not_convert_ids_to_file_paths(monkeypatch) -> None:
@@ -163,6 +162,14 @@ def test_submit_countersign(client: TestClient) -> None:
     response = client.post(ROUTE_EVENTS, json=_countersign_body(), headers=AUTH_HEADER)
     assert response.status_code == 200
     assert response.json()["status"] == STATUS_ACCEPTED
+
+
+def test_envelope_from_older_clients_with_contracts_version_is_accepted(
+    client: TestClient,
+) -> None:
+    body = {**_countersign_body(), "contracts_version": "0.50.0"}
+    response = client.post(ROUTE_EVENTS, json=body, headers=AUTH_HEADER)
+    assert response.status_code == 200
 
 
 def test_get_layer(client: TestClient, app_with_backend) -> None:
@@ -356,7 +363,6 @@ def test_countersign_accepts_justification_instead_of_rationale(client: TestClie
         ROUTE_EVENTS,
         json={
             "kind": "countersign",
-            "contracts_version": CONTRACTS_VERSION,
             "event": {
                 "layer_id": LAYER_ID,
                 "finding_ref": "FIND-JUST",
@@ -385,7 +391,6 @@ def test_unknown_decision_422(client: TestClient) -> None:
         ROUTE_EVENTS,
         json={
             "kind": "countersign",
-            "contracts_version": CONTRACTS_VERSION,
             "event": {
                 "layer_id": LAYER_ID,
                 "finding_ref": "FIND-001",

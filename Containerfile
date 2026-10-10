@@ -6,7 +6,7 @@
 # built here is copied wholesale into the runtime, and native-extension .so
 # files are ABI-pinned per minor while the venv's script shebangs hardcode
 # the builder's interpreter path.
-FROM registry.access.redhat.com/hi/python:3.12-builder@sha256:804e22f7879e389fb1bbd55ed580ca27c53470b947bf64428198e828b0cb8732 AS builder
+FROM registry.access.redhat.com/hi/python:3.12-builder@sha256:aa64794afb234eac11f21e2ca7c8430753f268a1a755d16f7f9c88ca5975bc33 AS builder
 
 ARG UV_VERSION=0.7
 
@@ -74,13 +74,13 @@ RUN uv pip install "psycopg[binary]>=${PSYCOPG_VERSION}"
 # ── cosign source ───────────────────────────────────────────────────
 # Take the cosign binary from a digest-pinned hardened image rather than
 # downloading a release at build time: no network fetch in the build.
-FROM registry.access.redhat.com/hi/cosign:latest@sha256:a792e841a4218c8e721f133859d8c137341343a7626f4cd37f0a56dc6b884696 AS cosign
+FROM registry.access.redhat.com/hi/cosign:latest@sha256:9d892a27d5ecc4235ce101798ea6d9f5f46221eb7447e309793db1c2450e384e AS cosign
 
 # ── Runtime stage ───────────────────────────────────────────────────
 # Minimal hardened Python runtime. Runs as a non-root user (UID 1001) by
 # default and ships no package manager, so nothing is installed here.
 # Python minor must match the builder stage above (see note there).
-FROM registry.access.redhat.com/hi/python:3.12@sha256:498c94612cda57eea0b2302d1d2e390a16b24129b25a23713fb16c040df27841 AS runtime
+FROM registry.access.redhat.com/hi/python:3.12@sha256:5b0e5b12807365bcbd766afbaab5ed3991cf77b081de3442c62aa5c02a42eeb2 AS runtime
 
 # OCI labels. VERSION and SOURCE_REVISION are supplied by the build.
 ARG SOURCE_REVISION=unknown
@@ -107,7 +107,17 @@ LABEL org.opencontainers.image.source="https://github.com/traust-security/traust
 # external sidecar; the key itself never ships here.
 COPY --from=cosign /usr/bin/cosign /usr/local/bin/cosign
 
-COPY --from=builder /build/.venv /app/.venv
+# --chown: the runtime base image runs as a non-root UID (65532) and the
+# rewire RUN below executes as that user, so it must own the copied files.
+COPY --from=builder --chown=65532:65532 /build/.venv /app/.venv
+
+# The venv was created at /build/.venv in the builder stage, so its
+# console-script shebangs (uvicorn, etc.) and `python` symlinks point at
+# builder paths that do not exist in the runtime image. Rewire them to
+# the runtime location. The runtime image ships no shell or package
+# manager, so this runs python (by absolute path, since the venv's own
+# symlinks are broken until fixed).
+RUN ["/usr/bin/python3.12", "-c", "import glob, os\nvenv_bin = '/app/.venv/bin'\nfor link, target in (('python3.12', '/usr/bin/python3.12'), ('python3', 'python3.12'), ('python', 'python3.12')):\n    path = os.path.join(venv_bin, link)\n    if os.path.lexists(path):\n        os.remove(path)\n    os.symlink(target, path)\nold = '#!/build/.venv/bin/python'\nnew = '#!/app/.venv/bin/python'\nfor script in glob.glob(os.path.join(venv_bin, '*')):\n    if not os.path.isfile(script) or os.path.islink(script):\n        continue\n    with open(script, 'rb+') as fh:\n        head = fh.read(len(old) + 8)\n        if head.startswith(old.encode()):\n            fh.seek(0)\n            fh.write(new.encode() + head[len(old):])"]
 
 ENV PATH="/app/.venv/bin:${PATH}" \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -119,7 +129,7 @@ EXPOSE ${APP_PORT}
 HEALTHCHECK --interval=15s --timeout=3s --retries=3 \
     CMD python -c "import httpx; httpx.get('http://localhost:${APP_PORT}/healthz').raise_for_status()"
 
-# The base image already defaults to a non-root user (UID 1001).
-USER 1001
+# Run as the base image's non-root user, matching the file ownership above.
+USER 65532
 
 ENTRYPOINT ["uvicorn", "traust_ledger.service.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]

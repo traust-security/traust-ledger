@@ -15,7 +15,7 @@ set -euo pipefail
 # Base image the builder stage uses; the tool reads its /etc/yum.repos.d/ for
 # the Hummingbird repo definitions. Keep in sync with the builder FROM in
 # Containerfile.
-BASE_IMAGE="${BASE_IMAGE:-registry.access.redhat.com/hi/python:3.11-builder@sha256:1ccc6a1d8b5094e643bb010c2b68d047013d863d107eee4c318d921d3978b5d8}"
+BASE_IMAGE="${BASE_IMAGE:-registry.access.redhat.com/hi/python:3.12-builder@sha256:e383f6e33a4a1bfb77562c1254b3b2d8c00aaa2e73c9d64043f88f49d5c11d7f}"
 ARCH="${ARCH:-x86_64}"
 TOOL_IMAGE="${TOOL_IMAGE:-localhost/rpm-lockfile-prototype}"
 

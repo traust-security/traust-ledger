@@ -122,7 +122,7 @@ Historical source-to-target copies use the explicit administrative command:
 ```bash
 export LAAS_MIGRATION_SOURCE_URL=postgresql+psycopg://user:pass@host/source
 export LAAS_MIGRATION_TARGET_URL=postgresql+psycopg://user:pass@host/target
-ledger migrate --source-database-url from-env
+ledger migrate --source-ledger-database-url from-env
 ledger materialize
 ```
 

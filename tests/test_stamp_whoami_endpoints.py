@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from conftest import (
     AUTH_HEADER,
-    CONTRACTS_VERSION,
     LAYER_ID,
     RATIONALE_OK,
     RECORDED_AT,
@@ -27,7 +26,7 @@ def _countersign_body(**overrides: object) -> dict[str, object]:
         "recorded_at": RECORDED_AT,
     }
     event.update(overrides)
-    return {"kind": "countersign", "contracts_version": CONTRACTS_VERSION, "event": event}
+    return {"kind": "countersign", "event": event}
 
 
 def _seed_layer(client: TestClient) -> None:

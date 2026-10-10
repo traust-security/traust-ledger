@@ -10,7 +10,7 @@ from functools import cache
 from pathlib import Path
 
 from jsonschema import Draft202012Validator, FormatChecker
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from traust_contracts.paths import schema_path
 
@@ -81,19 +81,6 @@ def _validate(layer: SourceLayer, signature_key: str | None = None) -> int:
         if failures:
             raise ValueError(f"{layer.source}: integrity verification failed: {failures[0]}")
     return warnings
-
-
-def iter_directory_layers(directory: Path) -> Iterator[SourceLayer]:
-    """Read a ledger data directory whose filenames are canonical layer IDs."""
-    for path in sorted(directory.glob("*.json")):
-        try:
-            document = _document(path.read_bytes(), str(path))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
-            yield SourceLayer(path.stem, {}, str(path), f"invalid layer document: {error}")
-            continue
-        if not isinstance(document.get("events"), list):
-            continue
-        yield SourceLayer(layer_id=path.stem, document=document, source=str(path))
 
 
 def iter_manifest_layers(directory: Path, manifest: Path) -> Iterator[SourceLayer]:
@@ -177,39 +164,6 @@ def iter_ledger_layers(engine: Engine) -> Iterator[SourceLayer]:
             source=f"ledger:{layer_id}",
             product_repo_id=backend.product_repo_id(layer_id),
         )
-
-
-def iter_artifact_layers(engine: Engine) -> Iterator[SourceLayer]:
-    """Read current complete layer evidence without using lossy projections."""
-    prefix = "traust_storage." if engine.dialect.name == "postgresql" else ""
-    statement = text(
-        f"""
-        SELECT b.layer_id, b.binding_id, e.digest, e.payload
-          FROM {prefix}artifact_binding b
-          JOIN {prefix}artifact_evidence e ON e.digest = b.artifact_digest
-         WHERE b.artifact_name = 'layer'
-           AND b.layer_id IS NOT NULL
-           AND NOT EXISTS (
-               SELECT 1 FROM {prefix}artifact_binding successor
-                WHERE successor.supersedes_binding_id = b.binding_id
-           )
-         ORDER BY b.layer_id, b.bound_at, b.binding_id
-        """
-    )
-    with engine.connect() as conn:
-        for row in conn.execute(statement).mappings():
-            payload = bytes(row["payload"])
-            digest = hashlib.sha256(payload).hexdigest()
-            source = f"artifact_binding:{row['binding_id']}"
-            if len(row["digest"]) == 64 and digest != row["digest"]:
-                yield SourceLayer(row["layer_id"], {}, source, "evidence digest mismatch")
-                continue
-            try:
-                document = _document(payload, source)
-            except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
-                yield SourceLayer(row["layer_id"], {}, source, f"invalid layer document: {error}")
-                continue
-            yield SourceLayer(layer_id=row["layer_id"], document=document, source=source)
 
 
 def migrate(

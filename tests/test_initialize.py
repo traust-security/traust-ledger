@@ -186,7 +186,7 @@ def test_client_create_requires_auth_and_shell(tmp_path: Path) -> None:
 def test_uninitialized_write_rejected_across_entry_points(
     tmp_path: Path, monkeypatch, capsys
 ) -> None:
-    from conftest import CONTRACTS_VERSION, RATIONALE_OK, RECORDED_AT
+    from conftest import RATIONALE_OK, RECORDED_AT
 
     from traust_ledger.cli.commands import submit as cli_submit
 
@@ -199,7 +199,6 @@ def test_uninitialized_write_rejected_across_entry_points(
         "/v1/ledger/events",
         json={
             "kind": "countersign",
-            "contracts_version": CONTRACTS_VERSION,
             "event": {
                 "layer_id": "missing",
                 "finding_ref": "FIND-001",

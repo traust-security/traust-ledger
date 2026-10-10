@@ -217,3 +217,13 @@ def test_build_row_passes_both_through():
     row = build_row("layer-1", findings[0], None, None, datetime.now(UTC))
     assert row["fingerprint"] == "c" * 64
     assert row["orphan"] is False
+
+
+def test_target_must_be_a_storage_initialized_database(tmp_path):
+    """The projection lives in a ledger database, and ledger tables live with storage."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'findings.db'}")
+    with pytest.raises(RuntimeError, match="initialize storage first"):
+        ensure_schema(engine)
+    prepare_storage(engine)
+    ensure_schema(engine)
+    ensure_schema(engine)

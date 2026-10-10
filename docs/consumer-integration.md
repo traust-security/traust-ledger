@@ -71,9 +71,7 @@ For services that run traust-ledger in the same environment:
 | `ledger submit <events.json>` | Submit events (same as REST batch) |
 | `ledger countersign <finding_ref>` | Two-person countersign |
 | `ledger fingerprint <report.json>` | Stamp fingerprints on a report |
-| `ledger migrate --source-dir <dir>` | Migrate flat historical layer files (filename stem is ID) |
-| `ledger migrate --source-dir <dir> --selection-manifest <file>` | Migrate selected nested layer files with pinned identities |
-| `ledger migrate --source-database-url <url>` | Migrate complete layer artifact evidence |
+| `ledger migrate --source-dir <dir> --selection-manifest <file>` | Migrate selected layer files with pinned identities and product_repo |
 | `ledger migrate --source-ledger-database-url <url>` | Copy normalized SQLite/PostgreSQL Ledger state |
 | `ledger materialize --to <url>` | Rebuild the queryable findings projection |
 | `ledger query layers` | List layers |
@@ -88,37 +86,33 @@ normal event submission. It does not mutate or delete the source. Credentials be
 environment variables:
 
 ```bash
-# Complete layer files from a Ledger data directory
 export LAAS_MIGRATION_TARGET_URL=postgresql://user:pass@host/database
-ledger migrate --source-dir /path/to/ledger-data --dry-run
-ledger migrate --source-dir /path/to/ledger-data
 
-# Nested findings tree: preview the same root with traust corpus migrate-artifacts plan
+# Findings tree: preview the same root with traust corpus migrate-artifacts plan
 ledger migrate --source-dir /path/to/analysis-results/findings \
   --selection-manifest /path/to/preview/decisions.jsonl --dry-run
 ledger migrate --source-dir /path/to/analysis-results/findings \
   --selection-manifest /path/to/preview/decisions.jsonl
-
-# Complete evidence already stored by artifact migration
-export LAAS_MIGRATION_SOURCE_URL=postgresql://user:pass@host/database
-ledger migrate --source-database-url from-env
 
 # Copy a dedicated SQLite Ledger into PostgreSQL
 export LAAS_MIGRATION_SOURCE_URL=sqlite:////path/to/ledger.db
 ledger migrate --source-ledger-database-url from-env
 
 # Resume or inspect one layer
-ledger migrate --source-dir /path/to/ledger-data --layer layer-a --json
+ledger migrate --source-dir /path/to/analysis-results/findings \
+  --selection-manifest /path/to/preview/decisions.jsonl --layer layer-a --json
 ```
 
 `--selection-manifest` accepts version 1 receipts from artifact preview; it uses
 only `traust_ledger` layer decisions, verifies the original SHA-256 and rejects
-unsafe paths, symlink aliases, or duplicate layer IDs before importing. Use the
-same source root for preview and migration. Without the manifest, `--source-dir`
-retains its flat-directory and filename-stem identity behavior.
-`--source-database-url from-env` selects database evidence while the real URL
-comes from `LAAS_MIGRATION_SOURCE_URL`; `LAAS_MIGRATION_TARGET_URL` always names
-the normalized Ledger destination. Migration validates complete layer documents,
+unsafe paths, symlink aliases, or duplicate layer IDs before importing. Each
+record carries the layer's `product_repo_id` (registered in traust storage in the
+target database); records without one are quarantined. Use the same source root
+for preview and migration; `--source-dir` and `--selection-manifest` are always
+given together. `--source-ledger-database-url from-env` copies normalized Ledger
+state, including each layer's `product_repo_id`, from `LAAS_MIGRATION_SOURCE_URL`
+(the source's registry rows must already exist in the target);
+`LAAS_MIGRATION_TARGET_URL` always names the normalized Ledger destination. Migration validates complete layer documents,
 preserves event array order, reconstructs after insertion, skips exact reruns,
 and reports differing existing history as a conflict. Set
 `LAAS_MIGRATION_SIGNATURE_KEY` to verify stored signatures; without it, signed
@@ -145,7 +139,8 @@ a SQL store (SQLite or Postgres):
 export LAAS_BACKEND_TYPE=file
 export LAAS_DATA_DIR=/path/to/layers
 
-# Populate a local SQLite
+# Populate a local SQLite (storage initialized first)
+python -c "import sqlite3; from traust_contracts.v1.storage import Store; Store(sqlite3.connect('findings.db')).init()"
 ledger materialize --to sqlite:///findings.db
 
 # Populate Postgres (credentials via env, not argv)
@@ -159,6 +154,9 @@ ledger materialize --to sqlite:///findings.db --layer repo-a --layer repo-b
 ledger materialize --ddl
 ```
 
+The target is a ledger database, so like every ledger database it must have
+traust storage initialized first (`traust_contracts` `Store.init`); the ledger
+tables are created on first use and verified afterwards.
 The projection table is keyed on `(layer_id, finding_ref)`. PostgreSQL exposes
 it as `traust_ledger.materialized_findings`; SQLite uses the unqualified table
 name. Re-running is idempotent. Each layer commits independently. To migrate and

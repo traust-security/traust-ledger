@@ -21,7 +21,6 @@ from traust_ledger._internal.backends.constants import BACKEND_TYPE_DB
 from traust_ledger.config import ServiceConfig
 from traust_ledger.service.app import create_app
 
-CONTRACTS = "0.4.4"
 LAYER = "auth-test"
 RECORDED = "2026-08-18T15:00:00+00:00"
 RATIONALE = "Confirmed via manual code review and dynamic analysis"
@@ -127,7 +126,6 @@ def auth_client(tmp_path, httpserver: HTTPServer, rsa_keypair, jwks_json):
 def _severity_event(layer_id=LAYER):
     return {
         "kind": "severity",
-        "contracts_version": CONTRACTS,
         "event": {
             "layer_id": layer_id,
             "finding_ref": "VULN-001",

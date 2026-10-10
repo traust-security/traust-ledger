@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 from conftest import (
     AUTH_HEADER,
-    CONTRACTS_VERSION,
     LAYER_ID,
     RATIONALE_OK,
     RECORDED_AT,
@@ -22,7 +21,6 @@ from traust_ledger.service.route_constants import ROUTE_EVENTS, ROUTE_LAYERS
 def _countersign_body() -> dict[str, object]:
     return {
         "kind": "countersign",
-        "contracts_version": CONTRACTS_VERSION,
         "event": {
             "layer_id": LAYER_ID,
             "finding_ref": "FIND-001",

@@ -4,48 +4,48 @@ lockfileVendor: redhat
 arches:
 - arch: x86_64
   packages:
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/g/git-2.55.0-2.hum1.x86_64.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/g/git-2.56.0-1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 48724
-    checksum: sha256:f2dffadcd073ee6f25c030a044c421bedad2d9cd9b4374a0214c16205e36e78d
+    size: 48444
+    checksum: sha256:165b40805767d8a26e30eaf7c4638cc57bd2188817f607745db7e2262d4fb733
     name: git
-    evr: 2.55.0-2.hum1
-    sourcerpm: git-2.55.0-2.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/g/git-core-2.55.0-2.hum1.x86_64.rpm
+    evr: 2.56.0-1.hum1
+    sourcerpm: git-2.56.0-1.hum1.src.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/g/git-core-2.56.0-1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 5759965
-    checksum: sha256:8ec1cc4af2814b258fd0093b9984b46c234f4c4061aec678374c900fb35a7a2f
+    size: 6072007
+    checksum: sha256:94947858432d5cf0c896a372dbc0020f2867fc4c7f620fcfda6972163bca602d
     name: git-core
-    evr: 2.55.0-2.hum1
-    sourcerpm: git-2.55.0-2.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/g/git-core-doc-2.55.0-2.hum1.noarch.rpm
+    evr: 2.56.0-1.hum1
+    sourcerpm: git-2.56.0-1.hum1.src.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/g/git-core-doc-2.56.0-1.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 3483496
-    checksum: sha256:a64b6831414b328fd293662b9e435ec65a5d7c50ad69dfac526ec27ce2b6d696
+    size: 3523118
+    checksum: sha256:c33ee609394af5cac45f4379bfaf127043237d261315af7072c4c47dc4a45986
     name: git-core-doc
-    evr: 2.55.0-2.hum1
-    sourcerpm: git-2.55.0-2.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/g/groff-base-1.24.1-2.hum1.x86_64.rpm
+    evr: 2.56.0-1.hum1
+    sourcerpm: git-2.56.0-1.hum1.src.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/g/groff-base-1.24.2-1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 1316439
-    checksum: sha256:df45c13900ac96f2360ff48b76916fa38b37408bf388e2adcb485cc0c950ddb7
+    size: 1316324
+    checksum: sha256:059e1d352d823e87f6d091441dae9a90a6191b7c3ef64f4e14bb4655db52f4e2
     name: groff-base
-    evr: 1.24.1-2.hum1
-    sourcerpm: groff-1.24.1-2.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/l/less-704-4.hum1.x86_64.rpm
+    evr: 1.24.2-1.hum1
+    sourcerpm: groff-1.24.2-1.hum1.src.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/l/less-710-1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 243004
-    checksum: sha256:cd63bfea209a9de5f8679c130e1d748e2a845e829dfd699ba52f19665f1a6714
+    size: 246163
+    checksum: sha256:f994cd38ae0258df0b3f42955b4819dc99f943ef7252fb5e81ace1f36425dab7
     name: less
-    evr: 704-4.hum1
-    sourcerpm: less-704-4.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/l/less-color-704-4.hum1.x86_64.rpm
+    evr: 710-1.hum1
+    sourcerpm: less-710-1.hum1.src.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/l/less-color-710-1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 17226
-    checksum: sha256:c5ef2affcc61ee2e1b04700993cf78091a980cac098b94862a73edcf7f955b6c
+    size: 17378
+    checksum: sha256:b121513946b2c8244debb4ef94483758322ed6613dffbf5378bafff3163238fc
     name: less-color
-    evr: 704-4.hum1
-    sourcerpm: less-704-4.hum1.src.rpm
+    evr: 710-1.hum1
+    sourcerpm: less-710-1.hum1.src.rpm
   - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/l/libedit-3.1-60.20260512cvs.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 119199
@@ -53,41 +53,41 @@ arches:
     name: libedit
     evr: 3.1-60.20260512cvs.hum1
     sourcerpm: libedit-3.1-60.20260512cvs.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/n/ncurses-6.6-3.hum1.x86_64.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/n/ncurses-6.6-3.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 450634
-    checksum: sha256:58759905f6ac15f86aca7c47e0a3567d4e59dfbb1afe5f323c9b418cfe30bd3f
+    size: 450626
+    checksum: sha256:222a4f523c8ea9e819642250c98a95b212f91f0ee09d7ced1e65cd1e534e90b0
     name: ncurses
-    evr: 6.6-3.hum1
-    sourcerpm: ncurses-6.6-3.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/o/openssh-10.4p1-4.hum1.x86_64.rpm
+    evr: 6.6-3.1.hum1
+    sourcerpm: ncurses-6.6-3.1.hum1.src.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/o/openssh-10.5p1-1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 392704
-    checksum: sha256:ea4064897352123219761ff0a759009727786f437b74b9524d644ccc94ee43b7
+    size: 397811
+    checksum: sha256:f006e6a72a2af121ff2ee0c04b5d82b7efd1f33419a0c5aee251ee7708d5bcf1
     name: openssh
-    evr: 10.4p1-4.hum1
-    sourcerpm: openssh-10.4p1-4.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/o/openssh-clients-10.4p1-4.hum1.x86_64.rpm
+    evr: 10.5p1-1.hum1
+    sourcerpm: openssh-10.5p1-1.hum1.src.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/o/openssh-clients-10.5p1-1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 850668
-    checksum: sha256:1408ac50f464c878f70f9b75e4b7bbb2fa57219f47c0a8e382be633cc4b5a66c
+    size: 851427
+    checksum: sha256:f0563de647206bcee89108c5869fa52e2ca4cd7a02073508ce5298b691eb3930
     name: openssh-clients
-    evr: 10.4p1-4.hum1
-    sourcerpm: openssh-10.4p1-4.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-AutoLoader-5.74-525.hum1.noarch.rpm
+    evr: 10.5p1-1.hum1
+    sourcerpm: openssh-10.5p1-1.hum1.src.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-AutoLoader-5.74-525.1.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 27578
-    checksum: sha256:f4c2ada31e7e2d719f09e3ffd292b5f56bae6b1474c75cd5926e8401d8a9a7db
+    size: 27582
+    checksum: sha256:840e6b487a6add37d1df6344491f1b60ccbb9cb319b9838a9ebdf21225cb5747
     name: perl-AutoLoader
-    evr: 5.74-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-B-1.89-525.hum1.x86_64.rpm
+    evr: 5.74-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-B-1.89-525.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 191199
-    checksum: sha256:e3e30d50cb473ce85caaaa309c3dd3941bd23b10eaac280f122b41ccdc8f1062
+    size: 191218
+    checksum: sha256:71433f10521365e498667449b888867c8ac7a3016f5f1230110b0244f25da5a1
     name: perl-B
-    evr: 1.89-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
+    evr: 1.89-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
   - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-Carp-1.54-527.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 35600
@@ -95,13 +95,13 @@ arches:
     name: perl-Carp
     evr: 1.54-527.hum1
     sourcerpm: perl-Carp-1.54-527.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-Class-Struct-0.68-525.hum1.noarch.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-Class-Struct-0.68-525.1.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 28446
-    checksum: sha256:fb4fe59a8c6ac257ab654c46f8c9c5222b985cf93ad8ed7605f4e981e6a8490b
+    size: 28450
+    checksum: sha256:3bbe1022279ad225736f2876b672f524223427ef0cab6b1cc5d422af5032e2d6
     name: perl-Class-Struct
-    evr: 0.68-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
+    evr: 0.68-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
   - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-Data-Dumper-2.192-528.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 63856
@@ -123,13 +123,13 @@ arches:
     name: perl-Digest-MD5
     evr: 2.59-527.hum1
     sourcerpm: perl-Digest-MD5-2.59-527.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-DynaLoader-1.57-525.hum1.x86_64.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-DynaLoader-1.57-525.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 32453
-    checksum: sha256:307f62a6d522cc5a24af7d51d03021c6d98fb82f96cafaac49054383bd20b22c
+    size: 32461
+    checksum: sha256:b91cd3b6f5ffa2ab55fb2bdb50c9badc4bfba5685867ff877a97490b71bde782
     name: perl-DynaLoader
-    evr: 1.57-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
+    evr: 1.57-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
   - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-Encode-3.24-527.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 1119809
@@ -137,13 +137,13 @@ arches:
     name: perl-Encode
     evr: 4:3.24-527.hum1
     sourcerpm: perl-Encode-3.24-527.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-Errno-1.38-525.hum1.x86_64.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-Errno-1.38-525.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 21128
-    checksum: sha256:46010798f3947453b538d04badc61af6145e86462fc68d6dc497c4f6112c25fb
+    size: 21145
+    checksum: sha256:e8e2ff85ddbfda7511e5bfd8da7339a133ed574828c4da16298518b6ac4d50ed
     name: perl-Errno
-    evr: 1.38-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
+    evr: 1.38-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
   - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-Error-0.17030-4.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 49258
@@ -158,20 +158,20 @@ arches:
     name: perl-Exporter
     evr: 5.79-527.hum1
     sourcerpm: perl-Exporter-5.79-527.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-Fcntl-1.20-525.hum1.x86_64.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-Fcntl-1.20-525.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 36292
-    checksum: sha256:015ca08148bd456ba77bbdd37c33593fdecc14fb6b2e8ad23b25091b897a45aa
+    size: 36299
+    checksum: sha256:94b5e3ee11ce83037fbdd0a509b3e4aa61ff5311e84b7946d95a8b90172e0156
     name: perl-Fcntl
-    evr: 1.20-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-File-Basename-2.86-525.hum1.noarch.rpm
+    evr: 1.20-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-File-Basename-2.86-525.1.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 23404
-    checksum: sha256:98f864fa6ae51d04bd0b0b155b47bb16bb8e75b62388b694b7555ffcd6597ab7
+    size: 23412
+    checksum: sha256:3fbee267c90350ce5b2e6317c1c293bc76c8fedaca1ad46d00b3891ff61d21cb
     name: perl-File-Basename
-    evr: 2.86-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
+    evr: 2.86-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
   - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-File-Path-2.18-527.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 42012
@@ -186,20 +186,20 @@ arches:
     name: perl-File-Temp
     evr: 1:0.231.200-527.hum1
     sourcerpm: perl-File-Temp-0.231.200-527.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-File-stat-1.14-525.hum1.noarch.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-File-stat-1.14-525.1.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 23285
-    checksum: sha256:55710136b88d27f206c423fb02b1b2b5656316bc7b9023928b83abc610178bca
+    size: 23293
+    checksum: sha256:bc514f71cf1985b415272478846627a05ae3a3078e25c451346c8a96196e34db
     name: perl-File-stat
-    evr: 1.14-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-FileHandle-2.05-525.hum1.noarch.rpm
+    evr: 1.14-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-FileHandle-2.05-525.1.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 21698
-    checksum: sha256:b15dddfddb3c233eb714eff679a6189a15bfda60c17e99b7854b08250cf74068
+    size: 21702
+    checksum: sha256:21ca1e76dc3c2dccbe586b9e1172052803117b6695828a9b5db53d2d9df6a1c0
     name: perl-FileHandle
-    evr: 2.05-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
+    evr: 2.05-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
   - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-Getopt-Long-2.58-527.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 72058
@@ -207,20 +207,20 @@ arches:
     name: perl-Getopt-Long
     evr: 1:2.58-527.hum1
     sourcerpm: perl-Getopt-Long-2.58-527.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-Getopt-Std-1.14-525.hum1.noarch.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-Getopt-Std-1.14-525.1.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 21894
-    checksum: sha256:dd0f176058f2594f5734c51e354df18a87fc484da24b37318096e2008efd1499
+    size: 21902
+    checksum: sha256:92f1e041334e0beb842e379e9de0053009a5d5450c8639b2e674253daeb8234d
     name: perl-Getopt-Std
-    evr: 1.14-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-Git-2.55.0-2.hum1.noarch.rpm
+    evr: 1.14-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-Git-2.56.0-1.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 45150
-    checksum: sha256:08db8f58e3d1ca9cafbf2696848de8dc5a4cef9cc10071508033729822490daf
+    size: 44867
+    checksum: sha256:e74c1d291fff42fad441ff810d5ced0c6bf5e8e5befe7904642e3fe18e7416cf
     name: perl-Git
-    evr: 2.55.0-2.hum1
-    sourcerpm: git-2.55.0-2.hum1.src.rpm
+    evr: 2.56.0-1.hum1
+    sourcerpm: git-2.56.0-1.hum1.src.rpm
   - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-HTTP-Tiny-0.096-528.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 66103
@@ -228,13 +228,13 @@ arches:
     name: perl-HTTP-Tiny
     evr: 0.096-528.hum1
     sourcerpm: perl-HTTP-Tiny-0.096-528.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-IO-1.55-525.hum1.x86_64.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-IO-1.55-525.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 90563
-    checksum: sha256:d4fcb94f68302289782a2c65a7ac82bf9b26219c4919cd81570bb11ec8ff8122
+    size: 90577
+    checksum: sha256:b186cbbc0362d6fa90c147b51c361d37b13c13f05ab0c50479e09adf8747411b
     name: perl-IO
-    evr: 1.55-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
+    evr: 1.55-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
   - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-IO-Socket-IP-0.44-528.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 49487
@@ -249,13 +249,13 @@ arches:
     name: perl-IO-Socket-SSL
     evr: 2.099-2.1.hum1
     sourcerpm: perl-IO-Socket-SSL-2.099-2.1.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-IPC-Open3-1.24-525.hum1.noarch.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-IPC-Open3-1.24-525.1.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 30448
-    checksum: sha256:3f6cac21515bb9b2e64706606c23519e57e9319dd1525af8eece1147b60678d6
+    size: 30456
+    checksum: sha256:ba3b470891cb4a4c4affa9b0b94d4a9237691054f8621466d167cffc94d635db
     name: perl-IPC-Open3
-    evr: 1.24-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
+    evr: 1.24-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
   - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-MIME-Base32-1.303-25.1.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 27454
@@ -270,13 +270,13 @@ arches:
     name: perl-MIME-Base64
     evr: 3.16-527.hum1
     sourcerpm: perl-MIME-Base64-3.16-527.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-NDBM_File-1.18-525.hum1.x86_64.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-NDBM_File-1.18-525.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 28884
-    checksum: sha256:79a31846228d3dd9f59bfa58c67f34a72e4acd720492980c3e2363de52d0d929
+    size: 28900
+    checksum: sha256:7bff764131f9d8824023855f44f37eeafd60b588a5aeee65656989cacb9ddba6
     name: perl-NDBM_File
-    evr: 1.18-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
+    evr: 1.18-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
   - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-Net-SSLeay-1.96-5.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 397789
@@ -284,13 +284,13 @@ arches:
     name: perl-Net-SSLeay
     evr: 1.96-5.1.hum1
     sourcerpm: perl-Net-SSLeay-1.96-5.1.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-POSIX-2.23-525.hum1.x86_64.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-POSIX-2.23-525.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 105149
-    checksum: sha256:185c3c4fb27368ce5b158878935e250e3fa3acf197cb59f93628bc3f1b5fde1b
+    size: 105161
+    checksum: sha256:d814bce09259f9626c028aa9a64028725b91280e5418379fb16ff7591d61cdcf
     name: perl-POSIX
-    evr: 2.23-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
+    evr: 2.23-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
   - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-PathTools-3.95-527.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 96093
@@ -333,13 +333,13 @@ arches:
     name: perl-Scalar-List-Utils
     evr: 5:1.70-527.hum1
     sourcerpm: perl-Scalar-List-Utils-1.70-527.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-SelectSaver-1.02-525.hum1.noarch.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-SelectSaver-1.02-525.1.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 17832
-    checksum: sha256:5dd17672fb6a0f0dd74c73f88a798979fb8c23658e15ba105353fcd22e9494f0
+    checksum: sha256:926855592e71d7ef82cad0a4dccce260906010a94d5bfc837ec3e52e4ef16aa1
     name: perl-SelectSaver
-    evr: 1.02-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
+    evr: 1.02-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
   - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-Socket-2.043-1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 63451
@@ -354,13 +354,13 @@ arches:
     name: perl-Storable
     evr: 1:3.41-527.hum1
     sourcerpm: perl-Storable-3.41-527.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-Symbol-1.09-525.hum1.noarch.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-Symbol-1.09-525.1.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 20369
-    checksum: sha256:bfda450c8c3845f3da5261010843e706c39afb48c3019303d7e7ae685fc8aca0
+    size: 20373
+    checksum: sha256:b96e00e6c243abdf970e65a1c48b7ebd947e5ccf21b9d95ff5c97678e23abb29
     name: perl-Symbol
-    evr: 1.09-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
+    evr: 1.09-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
   - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-Term-ANSIColor-5.01-528.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 54824
@@ -417,13 +417,13 @@ arches:
     name: perl-URI
     evr: 5.35-2.hum1
     sourcerpm: perl-URI-5.35-2.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-base-2.27-525.hum1.noarch.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-base-2.27-525.1.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 22436
-    checksum: sha256:40cd283490d0462999bc8dc2db51c1a1b3bad654a5c5728c31f6e5f68ecde877
+    checksum: sha256:38dd729e5a5dcba9ed30b5753dd4207239a27b3f8724a509a1e2438e23fde50a
     name: perl-base
-    evr: 2.27-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
+    evr: 2.27-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
   - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-constant-1.33-528.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 29538
@@ -431,27 +431,27 @@ arches:
     name: perl-constant
     evr: 1.33-528.hum1
     sourcerpm: perl-constant-1.33-528.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-if-0.61.000-525.hum1.noarch.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-if-0.61.000-525.1.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 20166
-    checksum: sha256:36b4050f3550890cb80ae5f910c22b92f4e570f0773716f6394e79f5b841337d
+    size: 20174
+    checksum: sha256:631b33608b092b066ea51b2c263ad05d44faba5d0b2d24f11c4408b1f04e969f
     name: perl-if
-    evr: 0.61.000-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-interpreter-5.42.2-525.hum1.x86_64.rpm
+    evr: 0.61.000-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-interpreter-5.42.2-525.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 80041
-    checksum: sha256:76aa02ee9188160d9f02fdb772d0e2e92554bdd13f621b5213f989ed950f2fb4
+    size: 80061
+    checksum: sha256:0d4010e83a82524d4e19f803dda75b1ede84184e79b6331bd9808ee31a043a37
     name: perl-interpreter
-    evr: 4:5.42.2-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-lib-0.65-525.hum1.x86_64.rpm
+    evr: 4:5.42.2-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-lib-0.65-525.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 21117
-    checksum: sha256:10f4b17a0eee8ff55e4f3cbe5c3176b9685f6c443d7da13d946758d75b2e7976
+    size: 21121
+    checksum: sha256:5aac57f2ff73e616662d44436fe4ca485734dbfe77210779736b05b98db47532
     name: perl-lib
-    evr: 0.65-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
+    evr: 0.65-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
   - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-libnet-3.15-528.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 137095
@@ -459,41 +459,41 @@ arches:
     name: perl-libnet
     evr: 3.15-528.hum1
     sourcerpm: perl-libnet-3.15-528.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-libs-5.42.2-525.hum1.x86_64.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-libs-5.42.2-525.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 2775038
-    checksum: sha256:23301bf0f399b04375fb9cdfeea0f5bd8425f2e85739809306a602ac9d653696
+    size: 2776085
+    checksum: sha256:fc40c0b7bc9525f0a444d5f45a01238fd728f1627509b68397d82dd3b9e14d15
     name: perl-libs
-    evr: 4:5.42.2-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-locale-1.13-525.hum1.noarch.rpm
+    evr: 4:5.42.2-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-locale-1.13-525.1.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 19650
-    checksum: sha256:97966d5d9c137971e090bfe56f72a4bc7ecdf11ea9afe9bd41c02f8ded5abedc
+    size: 19654
+    checksum: sha256:746294269dcfb5895f5a2774caeb725da012213c9288ca1f82fa1f7a5aac2d76
     name: perl-locale
-    evr: 1.13-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-mro-1.29-525.hum1.x86_64.rpm
+    evr: 1.13-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-mro-1.29-525.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 36360
-    checksum: sha256:1db9cd16b99e6130143621b7c2d815845f94fc6dad34fc0f75f8cffa5ab2b3ba
+    size: 36372
+    checksum: sha256:cb938fc427555b844bd923605e6ae4a4f6e9ae4b767884e9d357878da61dd8d4
     name: perl-mro
-    evr: 1.29-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-overload-1.40-525.hum1.noarch.rpm
+    evr: 1.29-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-overload-1.40-525.1.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 52479
-    checksum: sha256:860d4d80cc36026ac41942ada08ab0940a4a6ea91ecdd5c688f1b4c1ed70b500
+    checksum: sha256:7efccc3da9613afceefe71b811e1664c4c907ea6c1907e76ff8f281803902e21
     name: perl-overload
-    evr: 1.40-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-overloading-0.02-525.hum1.noarch.rpm
+    evr: 1.40-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-overloading-0.02-525.1.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 19039
-    checksum: sha256:44d5491a764a9a4a99334f0bafcecece3ba5e33afc634f00b65d6a63a1a57fbd
+    checksum: sha256:e5628b025e588ec5804b7e8ebd41af6b11aed5eeb2555891fbc6f62a5ea4e9b2
     name: perl-overloading
-    evr: 0.02-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
+    evr: 0.02-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
   - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-parent-0.244-527.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 21311
@@ -501,20 +501,20 @@ arches:
     name: perl-parent
     evr: 1:0.244-527.hum1
     sourcerpm: perl-parent-0.244-527.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-podlators-6.1.0-2.hum1.noarch.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-podlators-6.1.1-1.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 140021
-    checksum: sha256:65d315d970086e50ef5c0272dd7e1bf64385da4027c0d64c189e665bfad12800
+    size: 140694
+    checksum: sha256:c89066c052bbc6ef462242b9ed7500555aeefdf84d9aa9521e28b324049a875a
     name: perl-podlators
-    evr: 1:6.1.0-2.hum1
-    sourcerpm: perl-podlators-6.1.0-2.hum1.src.rpm
-  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-vars-1.05-525.hum1.noarch.rpm
+    evr: 1:6.1.1-1.hum1
+    sourcerpm: perl-podlators-6.1.1-1.hum1.src.rpm
+  - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/perl-vars-1.05-525.1.hum1.noarch.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 19126
-    checksum: sha256:0e877815d7503b8640955de83babf46fee61d63bf9c95f251eff082e8e7e28af
+    checksum: sha256:48e0afb904aacb3e9c519e68807c901c93526ce1e2204ada59d5d07c5f5c60f2
     name: perl-vars
-    evr: 1.05-525.hum1
-    sourcerpm: perl-5.42.2-525.hum1.src.rpm
+    evr: 1.05-525.1.hum1
+    sourcerpm: perl-5.42.2-525.1.hum1.src.rpm
   - url: https://packages.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/u/unzip-6.0-71.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 212951

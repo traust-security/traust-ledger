@@ -801,10 +801,6 @@ components:
         kind:
           type: string
           title: Kind
-        contracts_version:
-          type: string
-          title: Contracts Version
-          default: ''
         event:
           additionalProperties: true
           type: object

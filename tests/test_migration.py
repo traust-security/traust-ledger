@@ -16,8 +16,6 @@ from traust_contracts.v1.ledger import CONTRACT_VERSION, REVISION, TABLE_ORDER
 from traust_ledger._internal.backends.db import DbBackend
 from traust_ledger._internal.historical_migration import (
     SourceLayer,
-    iter_artifact_layers,
-    iter_directory_layers,
     iter_ledger_layers,
     iter_manifest_layers,
     migrate,
@@ -141,61 +139,71 @@ def test_migration_reports_conflict_without_overwrite(tmp_path: Path) -> None:
     assert DbBackend(create_engine(target)).load(Path("layer-a")) == original.document
 
 
-def test_artifact_source_reads_exact_current_evidence(tmp_path: Path) -> None:
-    source_url = f"sqlite:///{tmp_path / 'artifacts.db'}"
-    engine = create_engine(source_url)
-    payload = json.dumps(_layer()).encode()
-    digest = hashlib.sha256(payload).hexdigest()
-    with engine.begin() as conn:
-        conn.execute(
-            text(
-                "CREATE TABLE artifact_evidence ("
-                "digest TEXT PRIMARY KEY, payload BLOB NOT NULL, first_ingested_at TEXT NOT NULL)"
-            )
+def _manifest(tmp_path: Path, root: Path, rows: list[tuple[str, bytes, str | None]]) -> Path:
+    manifest = tmp_path / "selection.jsonl"
+    records = []
+    for name, payload, owner in rows:
+        (root / name).write_bytes(payload)
+        records.append(
+            {
+                "format_version": 1,
+                "source_file": name,
+                "source_digest": hashlib.sha256(payload).hexdigest(),
+                "namespace": "traust_ledger",
+                "decision": "selected",
+                "artifact": "layer",
+                "layer_id": Path(name).stem,
+                "product_repo_id": owner,
+            }
         )
-        conn.execute(
-            text(
-                "CREATE TABLE artifact_binding ("
-                "binding_id TEXT PRIMARY KEY, artifact_digest TEXT NOT NULL, "
-                "artifact_name TEXT NOT NULL, scope_id TEXT NOT NULL, subject_id TEXT, "
-                "run_id TEXT, layer_id TEXT, supersedes_binding_id TEXT, bound_at TEXT NOT NULL)"
-            )
-        )
-        conn.execute(
-            text(
-                "INSERT INTO artifact_evidence VALUES (:digest, :payload, '2026-01-01T00:00:00Z')"
-            ),
-            {"digest": digest, "payload": payload},
-        )
-        conn.execute(
-            text(
-                "INSERT INTO artifact_binding VALUES "
-                "('binding-1', :digest, 'layer', 'scope', NULL, NULL, "
-                "'layer-a', NULL, '2026-01-01T00:00:00Z')"
-            ),
-            {"digest": digest},
-        )
-
-    layers = list(iter_artifact_layers(engine))
-
-    assert [(layer.layer_id, layer.document) for layer in layers] == [("layer-a", _layer())]
+    manifest.write_text("".join(json.dumps(row) + "\n" for row in records))
+    return manifest
 
 
-def test_directory_migration_quarantines_bad_json_and_continues(tmp_path: Path) -> None:
-    source_dir = tmp_path / "source"
-    source_dir.mkdir()
-    (source_dir / "bad.json").write_text("{not json", encoding="utf-8")
-    (source_dir / "good.json").write_text(json.dumps(_layer()), encoding="utf-8")
+def test_manifest_migration_quarantines_bad_layers_and_continues(tmp_path: Path) -> None:
+    root = tmp_path / "source"
+    root.mkdir()
     target_url = f"sqlite:///{tmp_path / 'target.db'}"
-    prepare_storage(target_url)
+    owner = prepare_storage(target_url)
+    manifest = _manifest(
+        tmp_path,
+        root,
+        [
+            ("bad.json", b"{not json", owner),
+            ("unowned.json", json.dumps(_layer()).encode(), None),
+            ("good.json", json.dumps(_layer()).encode(), owner),
+        ],
+    )
 
-    results = list(migrate(iter_directory_layers(source_dir), target_url))
+    results = list(migrate(iter_manifest_layers(root, manifest), target_url))
 
     assert [(result.layer_id, result.status) for result in results] == [
         ("bad", "quarantined"),
-        ("good", "quarantined"),
+        ("unowned", "quarantined"),
+        ("good", "inserted"),
     ]
     assert "product_repo_id is required" in (results[1].detail or "")
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["--source-dir", "src"],
+        ["--selection-manifest", "m.jsonl", "--source-ledger-database-url", "sqlite://"],
+    ],
+)
+def test_cli_requires_source_dir_and_manifest_together(
+    argv: list[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("LAAS_MIGRATION_SOURCE_URL", raising=False)
+    target = f"sqlite:///{tmp_path / 'ledger.db'}"
+    with pytest.raises(SystemExit, match="go together"):
+        ledger_main(["migrate", *argv, "--target-database-url", target])
+
+
+def test_cli_has_no_artifact_storage_source() -> None:
+    with pytest.raises(SystemExit):
+        ledger_main(["migrate", "--source-database-url", "sqlite://"])
 
 
 def test_manifest_migrates_nested_layers_with_distinct_ids(tmp_path: Path) -> None:

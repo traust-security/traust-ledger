@@ -20,7 +20,6 @@ LAYER_ID = "repo-a"
 RECORDED_AT = "2026-01-16T00:00:00+00:00"
 RATIONALE_OK = "Reviewed source and confirmed exploit path."
 RATIONALE_SHORT = "too short"
-CONTRACTS_VERSION = "0.4.4"
 
 TEST_ISSUER = "https://sso.example.com/realms/test"
 

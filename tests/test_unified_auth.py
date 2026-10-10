@@ -603,7 +603,6 @@ class TestCLIResolveAuth:
 # 8. Mock-OIDC e2e — full round-trip through SDK and REST flows
 # ═══════════════════════════════════════════════════════════════════════════════
 
-CONTRACTS_VERSION = "0.4.4"
 LAYER_ID = "unified-auth-test"
 RECORDED = "2026-08-31T10:00:00+00:00"
 
@@ -611,7 +610,6 @@ RECORDED = "2026-08-31T10:00:00+00:00"
 def _severity_event(layer_id=LAYER_ID):
     return {
         "kind": "severity",
-        "contracts_version": CONTRACTS_VERSION,
         "event": {
             "layer_id": layer_id,
             "finding_ref": "UA-001",

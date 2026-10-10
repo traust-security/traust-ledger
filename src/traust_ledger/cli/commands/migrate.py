@@ -16,15 +16,13 @@ def _redact(url: str) -> str:
 def register_migrate_parser(subparsers: argparse._SubParsersAction) -> None:
     parser = subparsers.add_parser("migrate", help="Migrate complete historical layers")
     source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--source-dir", type=Path, help="Ledger data directory")
+    source.add_argument(
+        "--source-dir", type=Path, help="root of the files a --selection-manifest names"
+    )
     parser.add_argument(
         "--selection-manifest",
         type=Path,
-        help="decisions.jsonl from artifact preview; requires --source-dir",
-    )
-    source.add_argument(
-        "--source-database-url",
-        help="artifact storage SQLAlchemy URL; prefer LAAS_MIGRATION_SOURCE_URL for credentials",
+        help="decisions.jsonl naming each layer and its product_repo_id; requires --source-dir",
     )
     source.add_argument(
         "--source-ledger-database-url",
@@ -62,47 +60,33 @@ def cmd_migrate(args: argparse.Namespace) -> int:
     from sqlalchemy import create_engine
 
     from traust_ledger._internal.historical_migration import (
-        iter_artifact_layers,
-        iter_directory_layers,
         iter_ledger_layers,
         iter_manifest_layers,
         migrate,
     )
     from traust_ledger._internal.migrations import DatabaseRoles
 
-    source_url = (
-        os.environ.get("LAAS_MIGRATION_SOURCE_URL")
-        or args.source_database_url
-        or args.source_ledger_database_url
-    )
+    source_url = os.environ.get("LAAS_MIGRATION_SOURCE_URL") or args.source_ledger_database_url
     target_url = os.environ.get("LAAS_MIGRATION_TARGET_URL") or args.target_database_url
     if not target_url:
         raise SystemExit("target database required: set LAAS_MIGRATION_TARGET_URL")
-    if (args.source_database_url and "@" in args.source_database_url) or (
-        args.source_ledger_database_url and "@" in args.source_ledger_database_url
-    ):
+    if args.source_ledger_database_url and "@" in args.source_ledger_database_url:
         raise SystemExit("source URL contains credentials; use LAAS_MIGRATION_SOURCE_URL")
     if args.target_database_url and "@" in args.target_database_url:
         raise SystemExit("target URL contains credentials; use LAAS_MIGRATION_TARGET_URL")
 
-    if args.selection_manifest is not None and args.source_dir is None:
-        raise SystemExit("--selection-manifest requires --source-dir")
-    if args.source_dir is not None:
-        layers = (
-            iter(list(iter_manifest_layers(args.source_dir, args.selection_manifest)))
-            if args.selection_manifest is not None
-            else iter_directory_layers(args.source_dir)
+    if (args.selection_manifest is None) != (args.source_dir is None):
+        raise SystemExit(
+            "--source-dir and --selection-manifest go together: manifest records carry "
+            "each layer's identity and product_repo_id"
         )
+    if args.source_dir is not None:
+        layers = iter(list(iter_manifest_layers(args.source_dir, args.selection_manifest)))
         source_name = str(args.source_dir)
     else:
         if not source_url:
             raise SystemExit("source database required: set LAAS_MIGRATION_SOURCE_URL")
-        source_engine = create_engine(source_url)
-        layers = (
-            iter_ledger_layers(source_engine)
-            if args.source_ledger_database_url is not None
-            else iter_artifact_layers(source_engine)
-        )
+        layers = iter_ledger_layers(create_engine(source_url))
         source_name = _redact(source_url)
 
     selected = set(args.layers) if args.layers else None
