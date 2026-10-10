@@ -7,8 +7,6 @@ and wraps results in response models.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from traust_ledger._internal.backends import Backend
 from traust_ledger.api.findings import resolve_layer_findings as _resolve_layer_findings
 from traust_ledger.config import ServiceConfig
@@ -61,7 +59,7 @@ def resolve_all_findings(
         since_epoch: Only include layers with merkle_epoch >= this value
                      (incremental delta — skip unchanged layers).
     """
-    from traust_ledger.paths import layer_file_path
+    from traust_ledger.paths import layer_key
 
     all_ids = backend.list_layer_ids()
 
@@ -80,8 +78,7 @@ def resolve_all_findings(
         if scanned >= limit:
             break
 
-        path = layer_file_path(config.data_dir, layer_id)
-        layer = backend.load(Path(path) if isinstance(path, str) else path)
+        layer = backend.load(layer_key(backend, config.data_dir, layer_id))
 
         if since_epoch is not None and not _layer_has_events_since(layer, since_epoch):
             continue

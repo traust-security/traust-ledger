@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
 from auth_helpers import TokenActorVerifier
 from conftest import (
     AUTH_HEADER,
@@ -145,11 +146,13 @@ def test_corpus_layer_read_routes_preserve_full_id(
             seen.append(identifier) or {"layer_id": identifier, "events": [], "total": 0}
         ),
     )
-    for suffix in ("events", "findings", "cumulative"):
-        response = client.get(f"/v1/ledger/layers/{layer_id}/{suffix}", headers=AUTH_HEADER)
+    params = {"layer_id": layer_id}
+    for suffix in ("/events", "/findings", "/cumulative", "/verify", ""):
+        route = f"/v1/ledger/layer{suffix}"
+        response = client.get(route, params=params, headers=AUTH_HEADER)
         assert response.status_code == 200, response.text
         assert seen[-1] == layer_id
-        assert client.get(f"/v1/ledger/layers/{layer_id}/{suffix}").status_code == 401
+        assert client.get(route, params=params).status_code == 401
 
 
 def test_healthz(client: TestClient) -> None:
@@ -572,3 +575,72 @@ def test_actor_resolution_distinct_identities(tmp_path: Path) -> None:
     assert identities[0] != identities[1]
     assert identities[0] == "user:alice"
     assert identities[1] == "user:bob"
+
+
+# ─── Opaque database layer IDs (query addressing) ─────────────────────────────
+
+OPAQUE_LAYER_ID = "corpus:layer:org/repo__main/repo__main"
+ALICE = {"Authorization": "Bearer alice"}
+
+
+def _opaque_db_client(tmp_path: Path) -> TestClient:
+    from conftest import canonical_shell
+    from sqlalchemy import create_engine
+    from storage_db import prepare_storage
+
+    from traust_ledger._internal.backends.db import DbBackend
+
+    database_url = f"sqlite:///{tmp_path / 'ledger.db'}"
+    owner = prepare_storage(database_url)
+    config = ServiceConfig(
+        data_dir=str(tmp_path),
+        backend_type="db",
+        database_url=database_url,
+        signing_required=False,
+    )
+    client = TestClient(create_app(config, verifier=TokenActorVerifier()))
+    DbBackend(create_engine(database_url)).import_layer(
+        OPAQUE_LAYER_ID, canonical_shell(), product_repo_id=owner
+    )
+    return client
+
+
+def test_query_routes_read_and_write_opaque_database_layer(tmp_path: Path) -> None:
+    client = _opaque_db_client(tmp_path)
+    params = {"layer_id": OPAQUE_LAYER_ID}
+    countersign = _countersign_body(layer_id=OPAQUE_LAYER_ID)
+    assert client.post("/v1/ledger/events", json=countersign, headers=ALICE).status_code == 200
+
+    layer = client.get("/v1/ledger/layer", params=params, headers=ALICE)
+    assert layer.status_code == 200
+    assert [e["finding_ref"] for e in layer.json()["events"]] == ["FIND-001"]
+    for suffix in ("/events", "/findings", "/cumulative", "/verify"):
+        response = client.get(f"/v1/ledger/layer{suffix}", params=params, headers=ALICE)
+        assert response.status_code == 200, (suffix, response.text)
+    signed = client.post("/v1/ledger/layer/sign", params=params, headers=ALICE)
+    assert signed.status_code == 200, signed.text
+    assert signed.json()["layer_id"] == OPAQUE_LAYER_ID
+
+    bulk = client.get("/v1/ledger/findings", headers=ALICE).json()
+    assert [entry["layer_id"] for entry in bulk["layers"]] == [OPAQUE_LAYER_ID]
+
+
+def test_path_and_query_routes_serve_the_same_layer(client: TestClient) -> None:
+    by_path = client.get(f"/v1/ledger/layers/{LAYER_ID}", headers=AUTH_HEADER)
+    by_query = client.get("/v1/ledger/layer", params={"layer_id": LAYER_ID}, headers=AUTH_HEADER)
+    assert by_path.status_code == by_query.status_code == 200
+    assert by_path.json() == by_query.json()
+
+
+@pytest.mark.parametrize("layer_id", ["", " padded", "line\nbreak", "x" * 513])
+def test_query_route_rejects_malformed_database_ids(tmp_path: Path, layer_id: str) -> None:
+    client = _opaque_db_client(tmp_path)
+    response = client.get("/v1/ledger/layer", params={"layer_id": layer_id}, headers=ALICE)
+    assert 400 <= response.status_code < 500, response.text
+    assert response.status_code != 404
+
+
+def test_query_route_requires_layer_id_and_auth(tmp_path: Path) -> None:
+    client = _opaque_db_client(tmp_path)
+    assert client.get("/v1/ledger/layer", headers=ALICE).status_code == 422
+    assert client.get("/v1/ledger/layer", params={"layer_id": OPAQUE_LAYER_ID}).status_code == 401

@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator
-from pathlib import Path
 
 from traust_ledger._internal.backends import Backend, create_backend
 from traust_ledger._internal.writer import LedgerWriter
 from traust_ledger.config import ServiceConfig
-from traust_ledger.paths import layer_file_path
+from traust_ledger.paths import layer_key
 
 
 def backend_from_env() -> tuple[Backend, str]:
@@ -46,14 +45,8 @@ def iter_layers(
     data_dir: str,
 ) -> Iterator[tuple[str, dict]]:
     """Yield (layer_id, layer_dict) for every layer in the backend."""
-    database_loader = getattr(backend, "load_layer_id", None)
     for layer_id in backend.list_layer_ids():
-        if callable(database_loader):
-            yield layer_id, database_loader(layer_id)
-            continue
-        path = layer_file_path(data_dir, layer_id)
-        layer = backend.load(Path(path) if isinstance(path, str) else path)
-        yield layer_id, layer
+        yield layer_id, backend.load(layer_key(backend, data_dir, layer_id))
 
 
 def local_writer() -> tuple[LedgerWriter, ServiceConfig]:

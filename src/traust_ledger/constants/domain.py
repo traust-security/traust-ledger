@@ -45,6 +45,12 @@ ALLOWED_DECISIONS = frozenset(
 # use `pathlib.rglob` or `os.walk`, or it will under-count without saying so.
 LAYER_ID_PATTERN = r"^(?!\.\.)(?!.*\.\.)\.?[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$"
 
+# Database layer IDs are never filenames, so `LAYER_ID_PATTERN` does not apply: they are
+# bound as SQL values and may carry `:` and `/` (migrated corpus IDs such as
+# `corpus:layer:<subject>`). Still opaque: printable, no surrounding whitespace, bounded.
+DB_LAYER_ID_PATTERN = r"^[^\x00-\x20\x7f](?:[^\x00-\x1f\x7f]*[^\x00-\x20\x7f])?$"
+DB_LAYER_ID_MAX_LENGTH = 512
+
 # Storage assigns product_repo ids as str(uuid.uuid4()).
 PRODUCT_REPO_ID_PATTERN = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 
@@ -52,6 +58,8 @@ __all__ = [
     "ACTOR_KIND_HUMAN",
     "ACTOR_KIND_MACHINE",
     "ALLOWED_DECISIONS",
+    "DB_LAYER_ID_MAX_LENGTH",
+    "DB_LAYER_ID_PATTERN",
     "DECISION_FALSE_POSITIVE",
     "DECISION_KEEP_OPEN",
     "DECISION_OVERRIDE_FALSE_POSITIVE",

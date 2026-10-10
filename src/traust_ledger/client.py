@@ -43,7 +43,7 @@ from traust_ledger.handlers.resolve_handler import resolve_review_item
 from traust_ledger.handlers.submit_handler import submit_batch
 from traust_ledger.handlers.verify_handler import verify_layer
 from traust_ledger.models import BatchSubmitRequest
-from traust_ledger.paths import layer_file_path
+from traust_ledger.paths import layer_key
 
 T = TypeVar("T")
 
@@ -271,7 +271,7 @@ class LedgerClient:
         from traust_ledger.errors import ServiceError
 
         self._actor()
-        path = layer_file_path(self._config.data_dir, layer_id)
+        path = layer_key(self._backend, self._config.data_dir, layer_id)
         config = self._config
 
         def _finalize(layer: dict) -> str:
@@ -299,7 +299,7 @@ class LedgerClient:
         from traust_ledger.errors import ServiceError
 
         self._actor()
-        path = layer_file_path(self._config.data_dir, layer_id)
+        path = layer_key(self._backend, self._config.data_dir, layer_id)
         config = self._config
 
         from traust_ledger._internal.restatements import (
@@ -361,7 +361,7 @@ class LedgerClient:
         )
 
         self._actor()
-        path = layer_file_path(self._config.data_dir, layer_id)
+        path = layer_key(self._backend, self._config.data_dir, layer_id)
         config = self._config
 
         def _stamp_and_finalize(layer: dict) -> dict[str, Any]:

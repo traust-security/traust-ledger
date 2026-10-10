@@ -2,12 +2,35 @@
 
 All notable changes to traust-ledger are documented here.
 
-## [0.9.1]
+## [0.10.0]
+
+### Added
+
+- **Query-addressed layer routes.** Every layer operation is also served at
+  `/v1/ledger/layer<op>?layer_id=` (`GET` document, `/events`, `/findings`,
+  `/cumulative`, `/verify`; `POST` `/submit`, `/resolve`, `/restate`, `/sign`,
+  `/stamp`). A query value carries any opaque database ID, including `:` and
+  `/` (migrated corpus IDs such as `corpus:layer:<subject>`), which one path
+  segment cannot. The same handler serves both styles; the existing
+  `/v1/ledger/layers/{layer_id}…` routes remain for IDs that fit a segment.
 
 ### Fixed
 
-- Read findings, cumulative state, events and verification for opaque corpus
-  layer IDs containing slashes without changing stored identities or auth gates.
+- **Database layer IDs are opaque on every path.** Handlers, `LedgerClient` and
+  the sign/stamp routes resolved every ID through the filename rule
+  (`LAYER_ID_PATTERN`), so migrated layers whose IDs contain `:` or `/` could be
+  listed but not read, countersigned, resolved, restated, signed or stamped.
+  IDs now resolve per backend: file layers keep the confined-filename rule;
+  database layers bind the ID verbatim (printable, no surrounding whitespace,
+  at most 512 characters). `POST /v1/ledger/events` accepts such IDs in the
+  body, and bulk `GET /v1/ledger/findings` no longer fails on them.
+- Core installs (no `db` extra) still import `traust_ledger.client` without
+  SQLAlchemy.
+
+### Changed
+
+- Pins traust-contracts 0.52.0, the revert of generated numeric identity
+  (contracts 0.51.0): layer IDs are TEXT again.
 
 ## [0.9.0]
 

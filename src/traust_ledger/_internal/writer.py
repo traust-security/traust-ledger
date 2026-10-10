@@ -12,6 +12,7 @@ import jsonschema
 
 from traust_ledger._internal import events
 from traust_ledger._internal.backends import Backend, FileBackend
+from traust_ledger._internal.backends.keys import DbLayerKey, LayerKey, as_layer_key
 from traust_ledger._internal.disposition import is_actor_verified
 from traust_ledger._internal.errors import EventIdMismatchError, IdentityUnverifiedError
 from traust_ledger._internal.identity import ALGO_VERSION
@@ -173,7 +174,7 @@ class LedgerWriter:
 
     def _mutate_layer(
         self,
-        layer_path: Path,
+        layer_path: LayerKey,
         mutator: Callable[[dict], T],
     ) -> T:
         if hasattr(self.backend, "mutate"):
@@ -185,7 +186,7 @@ class LedgerWriter:
 
     def append_restatement(
         self,
-        layer_path: str | Path,
+        layer_path: str | Path | DbLayerKey,
         event: dict,
         metadata_updates: dict | Callable[[dict], dict],
         finalize: Callable[[dict], str] | None,
@@ -197,7 +198,7 @@ class LedgerWriter:
         changed and nothing in the log explains it. The snapshot is taken inside
         the mutator so it compares against what storage holds, not a stale read.
         """
-        layer_path = Path(layer_path)
+        layer_path = as_layer_key(layer_path)
 
         def _apply(layer: dict) -> tuple[str, str]:
             if before_append is not None:
@@ -242,7 +243,7 @@ class LedgerWriter:
 
     def append_event(
         self,
-        layer_path: str | Path,
+        layer_path: str | Path | DbLayerKey,
         event: dict,
     ) -> str:
         """Append an event to a layer, idempotently."""
@@ -251,12 +252,12 @@ class LedgerWriter:
 
     def append_event_finalized(
         self,
-        layer_path: str | Path,
+        layer_path: str | Path | DbLayerKey,
         event: dict,
         finalize: Callable[[dict], str] | None,
         before_append: Callable[[dict], None] | None,
     ) -> tuple[str, str]:
-        layer_path = Path(layer_path)
+        layer_path = as_layer_key(layer_path)
 
         def _append(layer: dict) -> tuple[str, str]:
             if before_append is not None:
@@ -270,7 +271,7 @@ class LedgerWriter:
 
     def resolve_needs_review(
         self,
-        layer_path: str | Path,
+        layer_path: str | Path | DbLayerKey,
         item_key: tuple,
         status: str,
         *,
@@ -284,7 +285,7 @@ class LedgerWriter:
         calls `resolve_review_item` directly instead, so the rules live in one
         place rather than being re-implemented beside every writer.
         """
-        layer_path = Path(layer_path)
+        layer_path = as_layer_key(layer_path)
 
         def _resolve_locked(layer: dict) -> bool:
             changed = resolve_review_item(
@@ -302,7 +303,7 @@ class LedgerWriter:
 
     def append_events_finalized(
         self,
-        layer_path: str | Path,
+        layer_path: str | Path | DbLayerKey,
         events: list[dict],
         finalize: Callable[[dict], str] | None,
         before_append: Callable[[dict], None] | None = None,
@@ -311,7 +312,7 @@ class LedgerWriter:
 
         Returns (event_ids, merkle_root). Idempotent per event_id.
         """
-        layer_path = Path(layer_path)
+        layer_path = as_layer_key(layer_path)
 
         def _append_batch(layer: dict) -> tuple[list[str], str]:
             if before_append is not None:
@@ -324,7 +325,7 @@ class LedgerWriter:
 
     def append_events(
         self,
-        layer_path: str | Path,
+        layer_path: str | Path | DbLayerKey,
         events: list[dict],
     ) -> list[str]:
         """Batch-append without finalization."""
@@ -333,7 +334,7 @@ class LedgerWriter:
 
     def append_needs_review(
         self,
-        layer_path: str | Path,
+        layer_path: str | Path | DbLayerKey,
         items: list[dict],
     ) -> int:
         """Append needs_review queue items, deduplicating by review_item_key.
@@ -341,7 +342,7 @@ class LedgerWriter:
         Returns count of newly appended items. Mutates items in-place
         (stamps status=pending if absent).
         """
-        layer_path = Path(layer_path)
+        layer_path = as_layer_key(layer_path)
 
         def _append_queue(layer: dict) -> int:
             queue = layer.get("needs_review") or []

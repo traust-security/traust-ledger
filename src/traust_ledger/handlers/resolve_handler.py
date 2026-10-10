@@ -7,7 +7,7 @@ from traust_ledger._internal.layer_finalize import require_signing_configured
 from traust_ledger._internal.writer import LedgerWriter
 from traust_ledger.config import ServiceConfig
 from traust_ledger.errors import NotFoundError, ValidationError
-from traust_ledger.paths import layer_file_path
+from traust_ledger.paths import layer_key
 from traust_ledger.service.errors import LayerNotFoundError
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ def resolve_review_item(
         )
 
     item_key = _parse_item_key(key)
-    layer_path = layer_file_path(config.data_dir, layer_id)
+    layer_path = layer_key(writer.backend, config.data_dir, layer_id)
 
     try:
         changed = writer.resolve_needs_review(

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from pathlib import Path
 
 from traust_contracts.v1.models.layer import LayerActor
@@ -14,13 +13,12 @@ from traust_ledger._internal.identity import ALGO_VERSION
 from traust_ledger._internal.layer_finalize import finalize_layer, require_signing_configured
 from traust_ledger._internal.writer import LedgerWriter, review_item_key
 from traust_ledger.config import ServiceConfig
-from traust_ledger.constants import LAYER_ID_PATTERN, STATUS_ACCEPTED
+from traust_ledger.constants import STATUS_ACCEPTED
 from traust_ledger.errors import ValidationError
 from traust_ledger.models import BatchSubmitRequest, SubmitResponse
-from traust_ledger.paths import layer_file_path
+from traust_ledger.paths import layer_key
 from traust_ledger.service.errors import (
     EventIdMismatchError,
-    InvalidLayerIdError,
     MissingLayerIdError,
 )
 
@@ -30,8 +28,6 @@ logger = logging.getLogger(__name__)
 def _validate_layer_id(layer_id: str) -> str:
     if not layer_id:
         raise MissingLayerIdError()
-    if not re.match(LAYER_ID_PATTERN, layer_id):
-        raise InvalidLayerIdError()
     return layer_id
 
 
@@ -111,7 +107,7 @@ def submit_batch(
     """
     require_signing_configured(config)
     layer_id = _validate_layer_id(layer_id)
-    layer_path = layer_file_path(config.data_dir, layer_id)
+    layer_path = layer_key(writer.backend, config.data_dir, layer_id)
 
     stamped_events = [
         _stamp_fingerprint_algo_on_event(_stamp_actor_on_event(e, actor)) for e in body.events

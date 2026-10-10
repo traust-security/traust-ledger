@@ -164,3 +164,38 @@ def test_whoami_requires_verifiable_token(tmp_path: Path) -> None:
     # No OIDC provider configured for the fake token → refuse, don't guess.
     with pytest.raises(LedgerError):
         _client(tmp_path).whoami()
+
+
+OPAQUE_LAYER_ID = "corpus:layer:org/repo__main/repo__main"
+
+
+def test_countersign_and_sign_reach_opaque_database_layer(tmp_path: Path) -> None:
+    # Migrated corpus layers keep slash/colon IDs; SCI's countersign must land on them.
+    from conftest import canonical_shell
+    from storage_db import prepare_storage
+
+    database_url = f"sqlite:///{tmp_path / 'ledger.db'}"
+    owner = prepare_storage(database_url)
+    client = LedgerClient(
+        token=FAKE_TOKEN,
+        backend_type="db",
+        database_url=database_url,
+        signing_config=SigningConfig(method="none"),
+        signing_required=False,
+    )
+    client._actor = lambda: _human()  # type: ignore[method-assign]
+    client._backend.import_layer(OPAQUE_LAYER_ID, canonical_shell(), product_repo_id=owner)
+
+    client.countersign(
+        OPAQUE_LAYER_ID,
+        "F-1",
+        rationale=RATIONALE,
+        recorded_at=AT,
+        decision="false_positive",
+        actor=_human(),
+    )
+    assert client.sign(OPAQUE_LAYER_ID)["layer_id"] == OPAQUE_LAYER_ID
+
+    events = client._backend.load_layer_id(OPAQUE_LAYER_ID)["events"]
+    assert [e["disposition"]["validity"] for e in events] == ["false_positive"]
+    assert client.verify(OPAQUE_LAYER_ID)

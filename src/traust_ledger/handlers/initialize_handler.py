@@ -9,7 +9,7 @@ from traust_ledger._internal.backends.errors import LayerStorageError
 from traust_ledger._internal.backends.validation import validate_layer
 from traust_ledger.config import ServiceConfig
 from traust_ledger.errors import ValidationError
-from traust_ledger.paths import layer_file_path
+from traust_ledger.paths import layer_key
 
 
 def initialize_layer(
@@ -29,7 +29,7 @@ def initialize_layer(
                 detail="initialization requires empty events and needs_review; "
                 "use administrative migration for historical evidence"
             )
-        backend.initialize(layer_file_path(config.data_dir, layer_id), shell, product_repo_id)
+        backend.initialize(layer_key(backend, config.data_dir, layer_id), shell, product_repo_id)
     except (LayerStorageError, ValueError) as exc:
         raise ValidationError(detail=str(exc)) from exc
     return {"layer_id": layer_id}

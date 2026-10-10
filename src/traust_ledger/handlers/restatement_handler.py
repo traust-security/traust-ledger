@@ -35,7 +35,7 @@ from traust_ledger._internal.writer import LedgerWriter
 from traust_ledger.config import ServiceConfig
 from traust_ledger.errors import ServiceError, ValidationError
 from traust_ledger.models import RestatementResponse
-from traust_ledger.paths import layer_file_path
+from traust_ledger.paths import layer_key
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ def apply_restatement(
         return {target: merge_delta(current, block.get("after"))}
 
     event_id, merkle_root = writer.append_restatement(
-        layer_file_path(config.data_dir, layer_id),
+        layer_key(writer.backend, config.data_dir, layer_id),
         event,
         _updates,
         lambda layer: finalize_layer(layer, config, layer_id=layer_id),

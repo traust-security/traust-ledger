@@ -12,7 +12,7 @@ from traust_ledger.cli import local_writer
 from traust_ledger.cli.auth import require_cli_auth
 from traust_ledger.cli.commands._fmt import print_submit_response
 from traust_ledger.cli.identity.actor import require_verified_actor
-from traust_ledger.paths import layer_file_path
+from traust_ledger.paths import layer_key
 
 
 def cmd_submit(args: argparse.Namespace) -> int:
@@ -59,7 +59,7 @@ def cmd_submit(args: argparse.Namespace) -> int:
     if actor is None:
         return 1
     writer, config = local_writer()
-    layer_path = layer_file_path(config.data_dir, args.layer)
+    layer_path = layer_key(writer.backend, config.data_dir, args.layer)
 
     stamped_events = []
     for event in events:

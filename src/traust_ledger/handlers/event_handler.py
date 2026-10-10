@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import re
 
 from traust_contracts.v1.models.layer import LayerActor
 
@@ -44,17 +43,15 @@ from traust_ledger.constants import (
     EVENT_KEY_SEVERITY,
     EVENT_KEY_SOURCE,
     EVENT_KEY_VERDICT,
-    LAYER_ID_PATTERN,
     STATUS_ACCEPTED,
     VERDICT_FALSE_POSITIVE,
     VERDICT_TRUE_POSITIVE,
 )
 from traust_ledger.models import EventEnvelope, SubmitResponse
-from traust_ledger.paths import layer_file_path
+from traust_ledger.paths import layer_key
 from traust_ledger.service.errors import (
     DecisionVerdictConflictError,
     EventIdMismatchError,
-    InvalidLayerIdError,
     MissingDecisionOrVerdictError,
     MissingFindingRefError,
     MissingLayerIdError,
@@ -123,8 +120,6 @@ def _require_layer_id(event: dict[str, object]) -> str:
     layer_id = event_text(event, EVENT_KEY_LAYER_ID)
     if not layer_id:
         raise MissingLayerIdError()
-    if not re.match(LAYER_ID_PATTERN, layer_id):
-        raise InvalidLayerIdError()
     return layer_id
 
 
@@ -231,7 +226,7 @@ def submit_event(
         if incoming_validity:
             require_verified_for_false_positive(stamped, incoming_validity)
 
-        layer_path = layer_file_path(config.data_dir, layer_id)
+        layer_path = layer_key(writer.backend, config.data_dir, layer_id)
 
         def _before_append(layer: dict[str, object]) -> None:
             require_valid_epoch(layer)

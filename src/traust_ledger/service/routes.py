@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Any, TypeVar
 
 from fastapi import APIRouter, Depends, Query, Request
 from traust_contracts.v1.models.layer import LayerActor
@@ -42,18 +43,36 @@ from traust_ledger.models import (
     SubmitResponse,
     VerifyResponse,
 )
-from traust_ledger.paths import layer_file_path
+from traust_ledger.paths import layer_key
 from traust_ledger.service.auth import authorize_restatement, require_identity, resolve_actor
 from traust_ledger.service.errors import LayerNotFoundError, ProductRepoLayerNotFoundError
 from traust_ledger.service.models import ErrorDetail, HealthResponse, ResolveRequest
 from traust_ledger.service.route_constants import (
     ROUTE_EVENTS,
     ROUTE_HEALTHZ,
+    ROUTE_LAYER,
     ROUTE_LAYERS,
     STATUS_HEALTHY,
 )
 
 router = APIRouter()
+F = TypeVar("F", bound=Callable[..., Any])
+
+
+def _layer_route(method: str, suffix: str, **kwargs: Any) -> Callable[[F], F]:
+    """Register one layer operation under both addressing styles.
+
+    ``/v1/ledger/layers/{layer_id}<suffix>`` keeps existing clients working for IDs that
+    fit one path segment; ``/v1/ledger/layer<suffix>?layer_id=`` carries any opaque
+    database ID. The same handler serves both, so behaviour cannot drift.
+    """
+
+    def register(endpoint: F) -> F:
+        for path in (ROUTE_LAYERS + suffix, ROUTE_LAYER + suffix):
+            router.add_api_route(path, endpoint, methods=[method], **kwargs)
+        return endpoint
+
+    return register
 
 
 def _config(request: Request) -> ServiceConfig:
@@ -94,8 +113,9 @@ async def post_event(
     return submit_event(envelope, actor, _writer(request), _config(request))
 
 
-@router.post(
-    "/v1/ledger/layers/{layer_id}/resolve",
+@_layer_route(
+    "POST",
+    "/resolve",
     response_model=ResolveResponse,
     dependencies=[Depends(require_identity)],
     responses={
@@ -120,8 +140,9 @@ async def resolve_review(
     return ResolveResponse(**result)
 
 
-@router.post(
-    "/v1/ledger/layers/{layer_id}/restate",
+@_layer_route(
+    "POST",
+    "/restate",
     response_model=RestatementResponse,
     responses={
         401: {"model": ErrorDetail, "description": "Missing or invalid authentication credentials"},
@@ -173,8 +194,9 @@ async def post_initialize_layer(
     )
 
 
-@router.get(
-    ROUTE_LAYERS,
+@_layer_route(
+    "GET",
+    "",
     dependencies=[Depends(require_identity)],
     responses={
         401: {
@@ -192,8 +214,9 @@ async def get_layer(layer_id: str, request: Request) -> dict[str, object]:
     return load_layer(layer_id, request.app.state.backend, config)
 
 
-@router.get(
-    "/v1/ledger/layers/{layer_id:path}/verify",
+@_layer_route(
+    "GET",
+    "/verify",
     response_model=VerifyResponse,
     dependencies=[Depends(require_identity)],
     responses={
@@ -213,8 +236,9 @@ async def verify_layer_endpoint(
     return VerifyResponse(**result)
 
 
-@router.get(
-    "/v1/ledger/layers/{layer_id:path}/findings",
+@_layer_route(
+    "GET",
+    "/findings",
     response_model=FindingsResponse,
     dependencies=[Depends(require_identity)],
     responses={
@@ -227,8 +251,9 @@ async def get_findings(layer_id: str, request: Request) -> FindingsResponse:
     return resolve_findings(layer_id, request.app.state.backend, config)
 
 
-@router.get(
-    "/v1/ledger/layers/{layer_id:path}/cumulative",
+@_layer_route(
+    "GET",
+    "/cumulative",
     response_model=FindingsResponse,
     dependencies=[Depends(require_identity)],
     responses={
@@ -242,8 +267,9 @@ async def get_cumulative(layer_id: str, request: Request) -> FindingsResponse:
     return resolve_findings(layer_id, request.app.state.backend, config)
 
 
-@router.get(
-    "/v1/ledger/layers/{layer_id:path}/events",
+@_layer_route(
+    "GET",
+    "/events",
     response_model=EventsResponse,
     dependencies=[Depends(require_identity)],
     responses={
@@ -300,8 +326,9 @@ async def get_all_findings(
     )
 
 
-@router.post(
-    "/v1/ledger/layers/{layer_id}/submit",
+@_layer_route(
+    "POST",
+    "/submit",
     response_model=SubmitResponse,
     responses={
         401: {"model": ErrorDetail, "description": "Missing or invalid authentication credentials"},
@@ -349,8 +376,9 @@ async def list_layers(
     )
 
 
-@router.post(
-    "/v1/ledger/layers/{layer_id}/sign",
+@_layer_route(
+    "POST",
+    "/sign",
     dependencies=[Depends(require_identity)],
     responses={
         401: {"model": ErrorDetail, "description": "Missing or invalid authentication credentials"},
@@ -365,7 +393,7 @@ async def sign_layer_endpoint(
 ) -> dict[str, object]:
     config = _config(request)
     backend = request.app.state.backend
-    path = layer_file_path(config.data_dir, layer_id)
+    path = layer_key(backend, config.data_dir, layer_id)
 
     def sign(layer: dict) -> dict:
         validate_layer(layer)
@@ -378,8 +406,9 @@ async def sign_layer_endpoint(
     return {**result, "layer_id": layer_id}
 
 
-@router.post(
-    "/v1/ledger/layers/{layer_id}/stamp",
+@_layer_route(
+    "POST",
+    "/stamp",
     response_model=StampResponse,
     dependencies=[Depends(require_identity)],
     responses={
@@ -395,7 +424,7 @@ async def stamp_layer_endpoint(
 ) -> StampResponse:
     config = _config(request)
     backend = request.app.state.backend
-    path = layer_file_path(config.data_dir, layer_id)
+    path = layer_key(backend, config.data_dir, layer_id)
 
     def stamp(layer: dict) -> dict:
         validate_layer(layer)

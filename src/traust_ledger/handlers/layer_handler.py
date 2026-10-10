@@ -4,23 +4,18 @@ import logging
 
 from traust_ledger._internal.backends import Backend
 from traust_ledger._internal.backends.constants import EMPTY_LAYER, LAYER_EVENTS_KEY
-from traust_ledger._internal.backends.db import DbBackend
 from traust_ledger._internal.backends.errors import InvalidLayerDocumentError
 from traust_ledger._internal.backends.validation import validate_layer
 from traust_ledger.config import ServiceConfig
 from traust_ledger.errors import ValidationError
-from traust_ledger.paths import layer_file_path
+from traust_ledger.paths import layer_key
 from traust_ledger.service.errors import LayerNotFoundError
 
 logger = logging.getLogger(__name__)
 
 
 def load_layer(layer_id: str, backend: Backend, config: ServiceConfig) -> dict[str, object]:
-    if isinstance(backend, DbBackend):
-        layer = backend.load_layer_id(layer_id)
-    else:
-        path = layer_file_path(config.data_dir, layer_id)
-        layer = backend.load(path)
+    layer = backend.load(layer_key(backend, config.data_dir, layer_id))
     events = layer.get(LAYER_EVENTS_KEY)
     # Only the raw absent sentinel is missing. A valid initialized shell can
     # legitimately have zero events and zero queued items.

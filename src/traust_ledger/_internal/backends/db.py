@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from copy import deepcopy
-from pathlib import Path
 from typing import TypeVar
 
 from sqlalchemy import insert, select, text, update
@@ -14,18 +13,23 @@ from traust_ledger._internal.migrations import enable_sqlite_foreign_keys, ledge
 
 from .constants import EMPTY_LAYER
 from .errors import LayerConflictError, LayerNotInitializedError, LayerStorageError
+from .keys import DbLayerKey, LayerKey
 from .records import LayerRecord, StoredLayerRecord
 from .validation import validate_layer
 
 T = TypeVar("T")
 
 
-def _layer_id(path: Path) -> str:
-    return path.stem
+def _layer_id(key: LayerKey) -> str:
+    """Opaque database ID; a file path (local CLI) keeps its historical filename stem."""
+    return key.layer_id if isinstance(key, DbLayerKey) else key.stem
 
 
 class DbBackend:
     """Normalized layer storage with ordered events and atomic reconstruction."""
+
+    #: Layer IDs are SQL values, not filenames; see ``traust_ledger.paths.layer_key``.
+    opaque_layer_ids = True
 
     def __init__(self, engine: Engine) -> None:
         enable_sqlite_foreign_keys(engine)
@@ -53,7 +57,7 @@ class DbBackend:
         with self._engine.connect() as conn:
             return self._has_layer(conn, layer_id)
 
-    def load(self, path: Path) -> dict:
+    def load(self, path: LayerKey) -> dict:
         return self.load_layer_id(_layer_id(path))
 
     def load_layer_id(self, layer_id: str) -> dict:
@@ -64,7 +68,7 @@ class DbBackend:
             validate_layer(layer)
         return deepcopy(layer) if layer is not None else deepcopy(EMPTY_LAYER)
 
-    def store(self, path: Path, data: dict) -> None:
+    def store(self, path: LayerKey, data: dict) -> None:
         validate_layer(data)
         layer_id = _layer_id(path)
         with self._engine.begin() as conn:
@@ -76,7 +80,7 @@ class DbBackend:
                 )
             self._persist(conn, layer_id, LayerRecord.from_document(data))
 
-    def mutate(self, path: Path, mutator: Callable[[dict], T]) -> T:
+    def mutate(self, path: LayerKey, mutator: Callable[[dict], T]) -> T:
         layer_id = _layer_id(path)
         with self._engine.begin() as conn:
             self._lock_layer(conn, layer_id)
@@ -122,7 +126,7 @@ class DbBackend:
             validate_layer(reconstructed)
             return "inserted"
 
-    def initialize(self, path: Path, data: dict, product_repo_id: str | None = None) -> None:
+    def initialize(self, path: LayerKey, data: dict, product_repo_id: str | None = None) -> None:
         """Create one complete layer atomically; never replace an existing layer."""
         _require_product_repo(product_repo_id)
         validate_layer(data)

@@ -560,7 +560,8 @@ class TestBulkParity:
         from traust_ledger.service import routes
 
         paths = [r.path for r in routes.router.routes if "restate" in getattr(r, "path", "")]
-        assert paths == ["/v1/ledger/layers/{layer_id}/restate"]
+        # One layer per request under either addressing style; no batch route.
+        assert paths == ["/v1/ledger/layers/{layer_id}/restate", "/v1/ledger/layer/restate"]
 
     def test_empty_batch_is_refused(self, tmp_path: Path) -> None:
         from traust_ledger.client import LedgerError

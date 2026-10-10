@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from pathlib import Path
 from typing import Protocol, TypeVar
 
 from .constants import (
@@ -13,26 +12,27 @@ from .constants import (
     UNKNOWN_BACKEND_MSG,
 )
 from .file import FileBackend
+from .keys import LayerKey
 
 T = TypeVar("T")
 
 
 class Backend(Protocol):
-    """Storage backend for disposition layer files."""
+    """Storage backend for disposition layers, keyed by file path or database ID."""
 
-    def load(self, path: Path) -> dict:
+    def load(self, path: LayerKey) -> dict:
         """Load a layer from storage."""
         ...
 
-    def initialize(self, path: Path, data: dict, product_repo_id: str | None = None) -> None:
+    def initialize(self, path: LayerKey, data: dict, product_repo_id: str | None = None) -> None:
         """Create a complete layer without replacing an existing one."""
         ...
 
-    def store(self, path: Path, data: dict) -> None:
+    def store(self, path: LayerKey, data: dict) -> None:
         """Persist a layer to storage."""
         ...
 
-    def mutate(self, path: Path, mutator: Callable[[dict], T]) -> T:
+    def mutate(self, path: LayerKey, mutator: Callable[[dict], T]) -> T:
         """Atomically load, mutate, and store a layer."""
         ...
 

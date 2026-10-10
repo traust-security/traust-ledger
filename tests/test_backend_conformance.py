@@ -206,6 +206,40 @@ def test_iter_layers_supports_file_and_database_identity_spaces(tmp_path):
     assert list(iter_layers(db_backend, str(data_dir))) == [(opaque_id, layer), ("repo-a", layer)]
 
 
+@pytest.mark.parametrize(
+    ("layer_id", "file_ok", "db_ok"),
+    [
+        ("repo-a", True, True),
+        (".github", True, True),
+        ("corpus:layer:org/repo__main/repo__main", False, True),
+        ("../escape", False, True),
+        ("", False, False),
+        (" padded", False, False),
+        ("line\nbreak", False, False),
+        ("x" * 513, True, False),
+    ],
+)
+def test_layer_key_validates_per_backend(
+    tmp_path: Path, layer_id: str, file_ok: bool, db_ok: bool
+) -> None:
+    """File IDs stay confined filenames; database IDs are opaque SQL values."""
+    from traust_ledger._internal.backends.keys import DbLayerKey
+    from traust_ledger.errors import InvalidLayerIdError, MissingLayerIdError
+    from traust_ledger.paths import layer_key
+
+    engine = create_engine("sqlite://")
+    for backend, ok in ((FileBackend(tmp_path), file_ok), (DbBackend(engine), db_ok)):
+        if not ok:
+            with pytest.raises((InvalidLayerIdError, MissingLayerIdError)):
+                layer_key(backend, str(tmp_path), layer_id)
+            continue
+        key = layer_key(backend, str(tmp_path), layer_id)
+        if isinstance(backend, DbBackend):
+            assert key == DbLayerKey(layer_id)
+        else:
+            assert key == tmp_path / f"{layer_id}.json"
+
+
 # ── Atomic mutate conformance ────────────────────────────────────────────
 
 
