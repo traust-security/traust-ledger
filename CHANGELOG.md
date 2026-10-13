@@ -2,6 +2,32 @@
 
 All notable changes to traust-ledger are documented here.
 
+## [0.12.0]
+
+### Fixed
+
+- **The service no longer liveness-kills under load** (#86). Every route was
+  `async def` over synchronous work (SQLAlchemy engine connects, JWT crypto,
+  cosign signing), so a request burst blocked the event loop and `/healthz`
+  starved past its probe timeout (observed: 21 container restarts in 23h
+  against the sci-api layer fan-out). Blocking routes are now plain `def`
+  handlers (Starlette threadpool), the OIDC resolver is offloaded through
+  `run_in_threadpool`, and `LedgerWriter`'s lazy schema cache is
+  lock-protected — it published the loaded flag before the schema, which
+  could let a racing thread skip layer validation.
+
+### Added
+
+- **Registry-driven layer-listing filters** (#86). `GET /v1/ledger/layers`
+  accepts repeatable `filter=key:op:value` parameters selected from an
+  allowlisted registry: column keys (`product_repo_id`, `layer_id`,
+  `merkle_epoch`, `updated_at`) push down as bound SQLAlchemy expressions;
+  JSON-item keys (`review_status`, `review_queue_reason`) select layers with
+  matching `needs_review` entries and embed them. Values are bound
+  parameters — request strings never reach SQL text. The legacy
+  `product_repo_id` query param and the refs-only response shape are
+  unchanged.
+
 ## [0.11.1]
 
 ### Changed
