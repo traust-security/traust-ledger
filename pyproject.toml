@@ -1,6 +1,6 @@
 [project]
 name = "traust-ledger"
-version = "0.11.4"
+version = "0.11.5"
 license = "Apache-2.0"
 description = "Disposition-ledger kernel: finding identity, event math, integrity (Merkle + signing), and the single ledger write path"
 requires-python = ">=3.11"
@@ -39,7 +39,7 @@ cli = ["httpx2"]
 ledger = "traust_ledger.cli.main:main"
 
 [tool.uv.sources]
-traust-contracts = { git = "https://github.com/traust-security/traust-contracts.git", rev = "0bd128b0547c71e565706d40462b77f93ef65c8e" }
+traust-contracts = { git = "https://github.com/traust-security/traust-contracts.git", rev = "25bfd178a4f595996ff2434c3ced0666dce3da96" }
 
 [build-system]
 requires = ["hatchling"]

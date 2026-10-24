@@ -2,6 +2,12 @@
 
 All notable changes to traust-ledger are documented here.
 
+## [0.11.5]
+
+- Consume the scanner-observation contract repair through the exact contracts
+  pin. No ledger identity, event, signing, disposition, schema or wire logic
+  changes; authored report constraints remain strict.
+
 ## [0.11.4]
 
 - Pin traust-contracts 0.62.0 (`f8c9cbd`): `owasp_llm_references` on report
