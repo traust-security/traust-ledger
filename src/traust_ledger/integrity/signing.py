@@ -10,14 +10,76 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
+from functools import wraps
 from pathlib import Path
 from time import perf_counter
-from typing import TypeVar
+from typing import ParamSpec, TypeVar
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
+_Params = ParamSpec("_Params")
 _Result = TypeVar("_Result")
+
+
+def _emit_terminal(
+    *,
+    operation: str,
+    provider: str,
+    method: str,
+    outcome: str,
+    reason: str,
+    started: float,
+) -> None:
+    duration_ms = (perf_counter() - started) * 1000
+    level = logging.INFO if outcome in {"signed", "verified"} else logging.WARNING
+    event_operation = f"ledger.{operation}"
+    log.log(
+        level,
+        "ledger provider operation=%s provider=%s method=%s outcome=%s reason=%s duration_ms=%.1f",
+        event_operation,
+        provider,
+        method,
+        outcome,
+        reason,
+        duration_ms,
+        extra={
+            "operation": event_operation,
+            "provider": provider,
+            "method": method,
+            "outcome": outcome,
+            "reason": reason,
+            "duration_ms": duration_ms,
+        },
+    )
+
+
+def _terminal_on_unexpected(
+    *, operation: str, provider: str, method: str
+) -> Callable[[Callable[_Params, _Result]], Callable[_Params, _Result]]:
+    """Emit one bounded event when a provider boundary unexpectedly raises."""
+
+    def decorate(function: Callable[_Params, _Result]) -> Callable[_Params, _Result]:
+        @wraps(function)
+        def guarded(*args: _Params.args, **kwargs: _Params.kwargs) -> _Result:
+            started = perf_counter()
+            try:
+                return function(*args, **kwargs)
+            except Exception:
+                _emit_terminal(
+                    operation=operation,
+                    provider=provider,
+                    method=method,
+                    outcome="failed",
+                    reason="unexpected_error",
+                    started=started,
+                )
+                raise
+
+        return guarded
+
+    return decorate
 
 
 def _terminal(
@@ -30,25 +92,13 @@ def _terminal(
     reason: str,
     started: float,
 ) -> _Result:
-    duration_ms = (perf_counter() - started) * 1000
-    level = logging.INFO if outcome in {"signed", "verified"} else logging.WARNING
-    log.log(
-        level,
-        "ledger provider operation=%s provider=%s method=%s outcome=%s reason=%s duration_ms=%.1f",
-        operation,
-        provider,
-        method,
-        outcome,
-        reason,
-        duration_ms,
-        extra={
-            "operation": f"ledger.{operation}",
-            "provider": provider,
-            "method": method,
-            "outcome": outcome,
-            "reason": reason,
-            "duration_ms": duration_ms,
-        },
+    _emit_terminal(
+        operation=operation,
+        provider=provider,
+        method=method,
+        outcome=outcome,
+        reason=reason,
+        started=started,
     )
     return result
 
@@ -159,6 +209,7 @@ class CosignBackend(SigningBackend):
     # Also fixed here: the v2 code piped the payload on stdin but never passed
     # the positional blob argument, so every invocation failed with "requires
     # at least 1 arg(s), only received 0" — keypair signing had never worked.
+    @_terminal_on_unexpected(operation="sign", provider="cosign", method="keypair")
     def sign(self, payload: bytes, key_path: str, *, rekor: bool = False) -> SignResult:
         started = perf_counter()
 
@@ -270,6 +321,7 @@ class CosignBackend(SigningBackend):
             raw = json.dumps(bundle, separators=(",", ":"))
         return done(SignResult(signature=raw, success=True), "signed", "completed")
 
+    @_terminal_on_unexpected(operation="verify", provider="cosign", method="keypair")
     def verify(self, payload: bytes, signature: str, key_path: str) -> VerifyResult:
         """Verify a v3 bundle, falling back to a v2 bare signature.
 
@@ -326,7 +378,7 @@ class CosignBackend(SigningBackend):
         if result.returncode != 0:
             return done(
                 VerifyResult(valid=False, error=result.stderr.decode(errors="replace").strip()),
-                "invalid",
+                "failed",
                 "nonzero_exit",
             )
         return done(VerifyResult(valid=True), "verified", "completed")
@@ -452,6 +504,7 @@ class SigstoreOIDCBackend(SigningBackend):
 
         return None
 
+    @_terminal_on_unexpected(operation="sign", provider="sigstore", method="identity")
     def sign(self, payload: bytes, key_path: str, *, rekor: bool = False) -> SignResult:
         started = perf_counter()
 
@@ -518,6 +571,7 @@ class SigstoreOIDCBackend(SigningBackend):
                 "provider_error",
             )
 
+    @_terminal_on_unexpected(operation="verify", provider="sigstore", method="identity")
     def verify(self, payload: bytes, signature: str, key_path: str) -> VerifyResult:
         started = perf_counter()
 
@@ -587,7 +641,7 @@ class SigstoreOIDCBackend(SigningBackend):
             error_str = str(e)
             return done(
                 VerifyResult(valid=False, error=error_str),
-                "invalid",
+                "failed",
                 "provider_error",
             )
 
