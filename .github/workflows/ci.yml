@@ -52,3 +52,23 @@ jobs:
       - uses: sigstore/cosign-installer@v4.1.2   # cosign 3: the signing tests use real keypairs
       - run: uv sync --frozen
       - run: make test
+
+  # Drift ratchet: new hand-wiring fails; .ratchet.json only shrinks (checked against the base
+  # branch's). traust-core is pulled in for this job only; the ledger doesn't depend on it.
+  ratchet:
+    runs-on: ubuntu-latest
+    env:
+      RATCHET: traust-core @ git+https://github.com/traust-security/traust-core@e0b2ddd98ca878cd4da478d98601415d9a8018c0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: |
+          BASE="${{ github.base_ref || 'development' }}"
+          git fetch --depth=1 origin "$BASE"
+          REF=""
+          if git show "origin/$BASE:.ratchet.json" > /tmp/ratchet-reference.json 2>/dev/null; then
+            REF="--reference /tmp/ratchet-reference.json"
+          fi
+          uvx --from "$RATCHET" python -m traust_core.v1.checks.ratchet src --baseline .ratchet.json $REF

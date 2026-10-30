@@ -1,0 +1,5 @@
+{
+  "src/traust_ledger/integrity/signing.py": {
+    "subprocess": 1
+  }
+}

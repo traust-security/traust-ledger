@@ -5,6 +5,7 @@ Python 3.11+ library (`traust_ledger.integrity`): the ledger's integrity primiti
 - **Before done:** `make lint-fix` then `make test`; CI enforces both
 - **Lint:** line length 100; ruff E/W/F/I/UP/B/SIM/PTH/RUF (`pyproject.toml`)
 - **Commits:** conventional `type(scope): subject`
+- **Drift ratchet:** CI runs traust-core's ratchet over `src`; `.ratchet.json` only shrinks. Its one entry is cosign's `subprocess` in `signing.py`; env, clock, file writes, HTTP and DB stay at zero (see *What doesn't*)
 - **No releases:** consumers pin by commit SHA. After a merge, traust-core bumps its `[tool.uv.sources]` pin and runs its ledger tests
 - **Format changes** (leaf bytes, signature payload, verification rules) must keep historical layers verifying: add a format number, never change an old one
 
