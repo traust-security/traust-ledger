@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
@@ -35,24 +36,27 @@ def _emit_terminal(
     duration_ms = (perf_counter() - started) * 1000
     level = logging.INFO if outcome in {"signed", "verified"} else logging.WARNING
     event_operation = f"ledger.{operation}"
-    log.log(
-        level,
-        "ledger provider operation=%s provider=%s method=%s outcome=%s reason=%s duration_ms=%.1f",
-        event_operation,
-        provider,
-        method,
-        outcome,
-        reason,
-        duration_ms,
-        extra={
-            "operation": event_operation,
-            "provider": provider,
-            "method": method,
-            "outcome": outcome,
-            "reason": reason,
-            "duration_ms": duration_ms,
-        },
-    )
+    # Application logging configuration must not replace a provider result or exception.
+    with suppress(Exception):
+        log.log(
+            level,
+            "ledger provider operation=%s provider=%s method=%s outcome=%s "
+            "reason=%s duration_ms=%.1f",
+            event_operation,
+            provider,
+            method,
+            outcome,
+            reason,
+            duration_ms,
+            extra={
+                "operation": event_operation,
+                "provider": provider,
+                "method": method,
+                "outcome": outcome,
+                "reason": reason,
+                "duration_ms": duration_ms,
+            },
+        )
 
 
 def _terminal_on_unexpected(
@@ -616,34 +620,39 @@ class SigstoreOIDCBackend(SigningBackend):
                 "invalid_bundle",
             )
 
-        try:
-            if not self._expected_identity or not self._oidc_issuer:
-                return done(
-                    VerifyResult(
-                        valid=False,
-                        error="OIDC verification requires expected_identity and "
-                        "oidc_issuer to be configured",
-                    ),
-                    "refused",
-                    "identity_policy_unavailable",
-                )
+        if not self._expected_identity or not self._oidc_issuer:
+            return done(
+                VerifyResult(
+                    valid=False,
+                    error="OIDC verification requires expected_identity and "
+                    "oidc_issuer to be configured",
+                ),
+                "refused",
+                "identity_policy_unavailable",
+            )
 
+        try:
             identity_policy = policy.Identity(
                 identity=self._expected_identity,
                 issuer=self._oidc_issuer,
             )
-
             verifier = self._build_verifier()
-            verifier.verify_artifact(payload, bundle, identity_policy)
-            return done(VerifyResult(valid=True), "verified", "completed")
-
         except Exception as e:
-            error_str = str(e)
             return done(
-                VerifyResult(valid=False, error=error_str),
+                VerifyResult(valid=False, error=str(e)),
                 "failed",
                 "provider_error",
             )
+
+        try:
+            verifier.verify_artifact(payload, bundle, identity_policy)
+        except Exception as e:
+            return done(
+                VerifyResult(valid=False, error=str(e)),
+                "invalid",
+                "verification_rejected",
+            )
+        return done(VerifyResult(valid=True), "verified", "completed")
 
 
 _METHOD_BACKENDS: dict[str, type[SigningBackend]] = {

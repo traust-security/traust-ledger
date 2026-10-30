@@ -204,6 +204,28 @@ def test_unexpected_cosign_file_error_emits_once_then_reraises(
     assert SECRET not in caplog.text and "private payload" not in caplog.text
 
 
+def test_logging_failure_does_not_replace_provider_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    result = mock.Mock(returncode=7, stdout=b"", stderr=SECRET.encode())
+    monkeypatch.setattr(subprocess, "run", mock.Mock(return_value=result))
+    monkeypatch.setattr(signing.log, "log", mock.Mock(side_effect=KeyError("operation")))
+    outcome = CosignBackend().sign(b"private document body", f"/{SECRET}.key")
+    assert not outcome.success and outcome.error == SECRET
+
+
+def test_logging_failure_does_not_replace_provider_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_import_check() -> bool:
+        raise RuntimeError(SECRET)
+
+    monkeypatch.setattr(signing, "_sigstore_importable", fail_import_check)
+    monkeypatch.setattr(signing.log, "log", mock.Mock(side_effect=KeyError("operation")))
+    with pytest.raises(RuntimeError, match=SECRET):
+        SigstoreOIDCBackend().sign(b"private payload", "")
+
+
 def test_unexpected_sigstore_setup_error_emits_once_then_reraises(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
@@ -275,6 +297,15 @@ def test_identity_verification_terminal_outcomes_are_distinct(
         verified = backend.verify(b"payload", "bundle", "")
     assert verified.valid
     assert (event(caplog).outcome, event(caplog).reason) == ("verified", "completed")
+
+    caplog.clear()
+    verifier.verify_artifact.side_effect = RuntimeError(SECRET)
+    with mock.patch.dict(sys.modules, modules), caplog.at_level(logging.INFO, logger=LOGGER):
+        rejected = backend.verify(b"private payload", f"bundle-{SECRET}", "")
+    record = event(caplog)
+    assert not rejected.valid and SECRET in (rejected.error or "")
+    assert (record.outcome, record.reason) == ("invalid", "verification_rejected")
+    assert SECRET not in caplog.text and "private payload" not in caplog.text
 
     caplog.clear()
 
