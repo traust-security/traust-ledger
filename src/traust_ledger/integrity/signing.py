@@ -5,12 +5,52 @@ from __future__ import annotations
 import abc
 import importlib.util
 import json
+import logging
 import shutil
 import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from time import perf_counter
+from typing import TypeVar
+
+log = logging.getLogger(__name__)
+log.addHandler(logging.NullHandler())
+_Result = TypeVar("_Result")
+
+
+def _terminal(
+    result: _Result,
+    *,
+    operation: str,
+    provider: str,
+    method: str,
+    outcome: str,
+    reason: str,
+    started: float,
+) -> _Result:
+    duration_ms = (perf_counter() - started) * 1000
+    level = logging.INFO if outcome in {"signed", "verified"} else logging.WARNING
+    log.log(
+        level,
+        "ledger provider operation=%s provider=%s method=%s outcome=%s reason=%s duration_ms=%.1f",
+        operation,
+        provider,
+        method,
+        outcome,
+        reason,
+        duration_ms,
+        extra={
+            "operation": f"ledger.{operation}",
+            "provider": provider,
+            "method": method,
+            "outcome": outcome,
+            "reason": reason,
+            "duration_ms": duration_ms,
+        },
+    )
+    return result
 
 
 def _sigstore_importable() -> bool:
@@ -120,6 +160,19 @@ class CosignBackend(SigningBackend):
     # the positional blob argument, so every invocation failed with "requires
     # at least 1 arg(s), only received 0" — keypair signing had never worked.
     def sign(self, payload: bytes, key_path: str, *, rekor: bool = False) -> SignResult:
+        started = perf_counter()
+
+        def done(result: SignResult, outcome: str, reason: str) -> SignResult:
+            return _terminal(
+                result,
+                operation="sign",
+                provider="cosign",
+                method=self.method_name,
+                outcome=outcome,
+                reason=reason,
+                started=started,
+            )
+
         with tempfile.TemporaryDirectory() as td:
             td_path = Path(td)
             blob = td_path / "payload.bin"
@@ -135,25 +188,41 @@ class CosignBackend(SigningBackend):
             try:
                 result = subprocess.run(cmd, capture_output=True, timeout=60)
             except (OSError, subprocess.SubprocessError) as e:
-                return SignResult(signature="", success=False, error=str(e))
+                return done(
+                    SignResult(signature="", success=False, error=str(e)),
+                    "failed",
+                    "process_error",
+                )
 
             if result.returncode != 0:
-                return SignResult(
-                    signature="",
-                    success=False,
-                    error=result.stderr.decode(errors="replace").strip(),
+                return done(
+                    SignResult(
+                        signature="",
+                        success=False,
+                        error=result.stderr.decode(errors="replace").strip(),
+                    ),
+                    "failed",
+                    "nonzero_exit",
                 )
             try:
                 raw = Path(bundle).read_text(encoding="utf-8").strip()
             except OSError as e:
-                return SignResult(
-                    signature="",
-                    success=False,
-                    error=f"cosign reported success but wrote no bundle: {e}",
+                return done(
+                    SignResult(
+                        signature="",
+                        success=False,
+                        error=f"cosign reported success but wrote no bundle: {e}",
+                    ),
+                    "failed",
+                    "bundle_missing",
                 )
 
         if not raw:
-            return SignResult(signature="", success=False, error="cosign wrote an empty bundle")
+            return done(
+                SignResult(signature="", success=False, error="cosign wrote an empty bundle"),
+                "failed",
+                "bundle_empty",
+            )
 
         try:
             bundle = json.loads(raw)
@@ -177,25 +246,29 @@ class CosignBackend(SigningBackend):
         if bundle is not None and not rekor:
             published = _transparency_evidence(bundle)
             if published:
-                return SignResult(
-                    signature="",
-                    success=False,
-                    error=(
-                        "REFUSING the signature: cosign published it to a "
-                        f"transparency log ({', '.join(published)}) despite "
-                        "being asked not to. The signature has been "
-                        "discarded, but the upload is already public and "
-                        "irreversible. cosign has almost certainly changed "
-                        "its flag contract again — see the "
-                        "transparency-log hazard note on the cosign entry "
-                        "in config/external-tools.yaml."
+                return done(
+                    SignResult(
+                        signature="",
+                        success=False,
+                        error=(
+                            "REFUSING the signature: cosign published it to a "
+                            f"transparency log ({', '.join(published)}) despite "
+                            "being asked not to. The signature has been "
+                            "discarded, but the upload is already public and "
+                            "irreversible. cosign has almost certainly changed "
+                            "its flag contract again — see the "
+                            "transparency-log hazard note on the cosign entry "
+                            "in config/external-tools.yaml."
+                        ),
                     ),
+                    "refused",
+                    "transparency_evidence",
                 )
 
         # Compact to one line so it round-trips through JSON layer metadata.
         if bundle is not None:
             raw = json.dumps(bundle, separators=(",", ":"))
-        return SignResult(signature=raw, success=True)
+        return done(SignResult(signature=raw, success=True), "signed", "completed")
 
     def verify(self, payload: bytes, signature: str, key_path: str) -> VerifyResult:
         """Verify a v3 bundle, falling back to a v2 bare signature.
@@ -205,6 +278,19 @@ class CosignBackend(SigningBackend):
         would invalidate history that was validly signed under the old
         contract.
         """
+        started = perf_counter()
+
+        def done(result: VerifyResult, outcome: str, reason: str) -> VerifyResult:
+            return _terminal(
+                result,
+                operation="verify",
+                provider="cosign",
+                method=self.method_name,
+                outcome=outcome,
+                reason=reason,
+                started=started,
+            )
+
         is_bundle = signature.lstrip().startswith("{")
         with tempfile.TemporaryDirectory() as td:
             td_path = Path(td)
@@ -235,11 +321,15 @@ class CosignBackend(SigningBackend):
             try:
                 result = subprocess.run(cmd, capture_output=True, timeout=60)
             except (OSError, subprocess.SubprocessError) as e:
-                return VerifyResult(valid=False, error=str(e))
+                return done(VerifyResult(valid=False, error=str(e)), "failed", "process_error")
 
         if result.returncode != 0:
-            return VerifyResult(valid=False, error=result.stderr.decode(errors="replace").strip())
-        return VerifyResult(valid=True)
+            return done(
+                VerifyResult(valid=False, error=result.stderr.decode(errors="replace").strip()),
+                "invalid",
+                "nonzero_exit",
+            )
+        return done(VerifyResult(valid=True), "verified", "completed")
 
 
 class SigstoreOIDCBackend(SigningBackend):
@@ -363,67 +453,125 @@ class SigstoreOIDCBackend(SigningBackend):
         return None
 
     def sign(self, payload: bytes, key_path: str, *, rekor: bool = False) -> SignResult:
+        started = perf_counter()
+
+        def done(result: SignResult, outcome: str, reason: str) -> SignResult:
+            return _terminal(
+                result,
+                operation="sign",
+                provider="sigstore",
+                method=self.method_name,
+                outcome=outcome,
+                reason=reason,
+                started=started,
+            )
+
         if not _sigstore_importable():
-            return SignResult(
-                signature="",
-                success=False,
-                error="sigstore package not installed — install with: pip install sigstore",
+            return done(
+                SignResult(
+                    signature="",
+                    success=False,
+                    error="sigstore package not installed — install with: pip install sigstore",
+                ),
+                "refused",
+                "dependency_unavailable",
             )
 
         url_err = self._validate_custom_urls()
         if url_err:
-            return SignResult(signature="", success=False, error=url_err)
+            return done(
+                SignResult(signature="", success=False, error=url_err),
+                "refused",
+                "invalid_configuration",
+            )
 
         try:
             identity_token = self._resolve_identity_token()
             if identity_token is None:
-                return SignResult(
-                    signature="",
-                    success=False,
-                    error="No OIDC token available — pass SigningConfig.oidc_token, "
-                    "run in a CI environment with ambient credentials, or "
-                    "set SigningConfig.allow_interactive",
+                return done(
+                    SignResult(
+                        signature="",
+                        success=False,
+                        error="No OIDC token available — pass SigningConfig.oidc_token, "
+                        "run in a CI environment with ambient credentials, or "
+                        "set SigningConfig.allow_interactive",
+                    ),
+                    "refused",
+                    "credential_unavailable",
                 )
 
             ctx = self._build_signing_context()
             with ctx.signer(identity_token) as signer:
                 bundle = signer.sign_artifact(payload)
 
-            return SignResult(signature=bundle.to_json(), success=True)
+            return done(SignResult(signature=bundle.to_json(), success=True), "signed", "completed")
 
         except Exception as e:
             error_msg = str(e) or type(e).__name__
-            return SignResult(
-                signature="",
-                success=False,
-                error=f"Signing failed ({type(e).__name__}): {error_msg}",
+            return done(
+                SignResult(
+                    signature="",
+                    success=False,
+                    error=f"Signing failed ({type(e).__name__}): {error_msg}",
+                ),
+                "failed",
+                "provider_error",
             )
 
     def verify(self, payload: bytes, signature: str, key_path: str) -> VerifyResult:
+        started = perf_counter()
+
+        def done(result: VerifyResult, outcome: str, reason: str) -> VerifyResult:
+            return _terminal(
+                result,
+                operation="verify",
+                provider="sigstore",
+                method=self.method_name,
+                outcome=outcome,
+                reason=reason,
+                started=started,
+            )
+
         try:
             from sigstore.models import Bundle
             from sigstore.verify import policy
         except ImportError:
-            return VerifyResult(
-                valid=False,
-                error="sigstore package not installed — install with: pip install sigstore",
+            return done(
+                VerifyResult(
+                    valid=False,
+                    error="sigstore package not installed — install with: pip install sigstore",
+                ),
+                "refused",
+                "dependency_unavailable",
             )
 
         url_err = self._validate_custom_urls()
         if url_err:
-            return VerifyResult(valid=False, error=url_err)
+            return done(
+                VerifyResult(valid=False, error=url_err),
+                "refused",
+                "invalid_configuration",
+            )
 
         try:
             bundle = Bundle.from_json(signature)
         except Exception as e:
-            return VerifyResult(valid=False, error=f"Failed to deserialize signing bundle: {e}")
+            return done(
+                VerifyResult(valid=False, error=f"Failed to deserialize signing bundle: {e}"),
+                "invalid",
+                "invalid_bundle",
+            )
 
         try:
             if not self._expected_identity or not self._oidc_issuer:
-                return VerifyResult(
-                    valid=False,
-                    error="OIDC verification requires expected_identity and "
-                    "oidc_issuer to be configured",
+                return done(
+                    VerifyResult(
+                        valid=False,
+                        error="OIDC verification requires expected_identity and "
+                        "oidc_issuer to be configured",
+                    ),
+                    "refused",
+                    "identity_policy_unavailable",
                 )
 
             identity_policy = policy.Identity(
@@ -433,11 +581,15 @@ class SigstoreOIDCBackend(SigningBackend):
 
             verifier = self._build_verifier()
             verifier.verify_artifact(payload, bundle, identity_policy)
-            return VerifyResult(valid=True)
+            return done(VerifyResult(valid=True), "verified", "completed")
 
         except Exception as e:
             error_str = str(e)
-            return VerifyResult(valid=False, error=error_str)
+            return done(
+                VerifyResult(valid=False, error=error_str),
+                "invalid",
+                "provider_error",
+            )
 
 
 _METHOD_BACKENDS: dict[str, type[SigningBackend]] = {
