@@ -6,7 +6,7 @@
 # built here is copied wholesale into the runtime, and native-extension .so
 # files are ABI-pinned per minor while the venv's script shebangs hardcode
 # the builder's interpreter path.
-FROM registry.access.redhat.com/hi/python:3.12-builder@sha256:a447d0a9f4b2f1c6ed9f9b2c3b6362eb89fe8d75ffcd5832e4a0e98ba23bb234 AS builder
+FROM registry.access.redhat.com/hi/python:3.12-builder@sha256:809f01ba8db118489cff195fe38b512d9ad6996d49002d9622ba3aae28012952 AS builder
 
 ARG UV_VERSION=0.7
 
