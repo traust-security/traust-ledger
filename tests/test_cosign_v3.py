@@ -137,33 +137,3 @@ def test_sign_refuses_to_emit_a_published_signature(monkeypatch, tmp_path):
     assert r.signature == "", "the signature must be discarded"
     assert "REFUSING" in (r.error or "")
     assert "tlogEntries" in (r.error or "")
-
-
-def test_explicit_rekor_request_is_allowed_through(monkeypatch):
-    """Opt-in publication stays possible — the guard blocks the accident, not
-    the deliberate choice."""
-    import json as _json
-
-    from traust_ledger.integrity import signing as _s
-
-    def fake_run(cmd, **kwargs):
-        bundle = cmd[cmd.index("--bundle") + 1]
-        Path(bundle).write_text(
-            _json.dumps(
-                {
-                    "messageSignature": {"signature": "aaa"},
-                    "verificationMaterial": {"tlogEntries": [{"logIndex": 1}]},
-                }
-            )
-        )
-
-        class R:
-            returncode = 0
-            stderr = b""
-            stdout = b""
-
-        return R()
-
-    monkeypatch.setattr(_s.subprocess, "run", fake_run)
-    r = _s.CosignBackend().sign(b"payload", "/tmp/key.pem", rekor=True)
-    assert r.success, r.error

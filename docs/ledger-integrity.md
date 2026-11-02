@@ -33,8 +33,7 @@ Every function reads and stamps one shape:
 | Function | Does |
 |---|---|
 | `stamp_merkle_metadata(layer)` | recomputes root and size; a changed root drops a stale signature (returns `True`) |
-| `sign_if_configured(layer, config)` | signs the stamped metadata when `config` has a key (keypair) or token (identity); else `unconfigured`. Never silent on failure |
-| `stamp_and_sign(layer, config)` | both, in the right order |
+| `sign_if_configured(layer, config)` | signs the stamped metadata when `config` has a key; else `unconfigured`. Never silent on failure |
 
 A writer that appends from a frontier sets `merkle_root` and `merkle_size` itself (`frontier_root`) and calls `sign_if_configured` on a document with only the metadata: signing never reads events. The frontier is the writer's to store (traust-core keeps it on the layer row); it isn't part of the document.
 
@@ -45,7 +44,6 @@ The signature (format 4) covers a digest of the root, leaf format, epoch, size, 
 | `method` | Signs with |
 |---|---|
 | `keypair` | cosign 3 and a private key (`key_path`); offline, no transparency-log upload |
-| `identity` | keyless Sigstore with an OIDC token; optional private Fulcio / Rekor (`ca_url`, `tlog_url`) |
 
 ## Verification
 

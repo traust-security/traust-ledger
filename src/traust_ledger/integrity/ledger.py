@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from enum import Enum
 
 from .merkle import (
@@ -34,7 +34,6 @@ __all__ = [
     "merkle_root_payload",
     "merkle_signature_payload",
     "sign_if_configured",
-    "stamp_and_sign",
     "stamp_merkle_metadata",
     "verify_merkle_integrity",
     "verify_merkle_signature",
@@ -164,8 +163,8 @@ class SignAttempt:
     def warning(self) -> str | None:
         """The one thing a writer must print, or None when nothing is wrong.
 
-        Exists so the six call sites stop hand-rolling the same conditional and
-        cannot disagree about which outcomes are reportable.
+        Exists so callers do not hand-roll the same conditional and disagree
+        about which outcomes are reportable.
         """
         if self.status == "failed":
             return f"Merkle root stamped but NOT signed ({self.error})"
@@ -178,12 +177,7 @@ class SignAttempt:
         return None
 
 
-def sign_if_configured(
-    layer: dict,
-    config: SigningConfig,
-    *,
-    rekor: bool = False,
-) -> SignAttempt:
+def sign_if_configured(layer: dict, config: SigningConfig) -> SignAttempt:
     """Sign `metadata.merkle_root` in place when a signing key is configured.
 
     The write-path counterpart to `stamp_merkle_metadata`. Every writer stamps a
@@ -196,39 +190,31 @@ def sign_if_configured(
     metadata (root + leaf_format + epoch + size + pre-epoch checkpoint) via
     `merkle_signature_payload`. Signing before stamping would sign a stale root.
 
-    With no key (keypair) or token (identity) in `config` this is a no-op
-    returning `unconfigured`, so wiring it into a writer is safe before any key
-    exists. Whether signing is required is the caller's decision.
+    With no key in `config` this is a no-op returning `unconfigured`, so
+    wiring it into a writer is safe before any key exists. Whether signing is
+    required is the caller's decision.
     """
-    method = getattr(config, "method", "keypair") or "keypair"
     key_path = getattr(config, "key_path", None)
-
-    # Only the keypair backend needs a key path; identity signing derives an
-    # ephemeral key from an OIDC token, so treat a missing token as unconfigured
-    # too rather than attempting an interactive flow inside a batch writer.
-    if method == "keypair":
-        if not key_path:
-            return SignAttempt("unconfigured")
-    elif not getattr(config, "oidc_token", None):
-        return SignAttempt("unconfigured", method=method)
+    if not key_path:
+        return SignAttempt("unconfigured")
 
     meta = layer.get("metadata") or {}
     if not meta.get("merkle_root"):
         return SignAttempt(
             "failed",
-            method=method,
+            method="keypair",
             error="no metadata.merkle_root to sign — call stamp_merkle_metadata() first",
         )
 
     try:
         backend = get_backend_from_config(config)
-        result = backend.sign(merkle_signature_payload(meta), key_path or "", rekor=rekor)
+        result = backend.sign(merkle_signature_payload(meta), key_path)
     except Exception as e:  # backend/tool unavailable
-        return SignAttempt("failed", method=method, error=str(e))
+        return SignAttempt("failed", method="keypair", error=str(e))
 
     if not getattr(result, "success", False):
         return SignAttempt(
-            "failed", method=method, error=getattr(result, "error", None) or "sign failed"
+            "failed", method="keypair", error=getattr(result, "error", None) or "sign failed"
         )
 
     meta["merkle_root_signature"] = result.signature
@@ -236,26 +222,6 @@ def sign_if_configured(
     meta["merkle_signature_format"] = SIGNATURE_FORMAT_CURRENT
     layer["metadata"] = meta
     return SignAttempt("signed", method=backend.method_name)
-
-
-def stamp_and_sign(layer: dict, config: SigningConfig, *, rekor: bool = False) -> SignAttempt:
-    """Stamp the Merkle metadata, then sign it if a key is configured.
-
-    The single entry point every write path should use, so that "stamped" and
-    "signed" cannot drift apart. Equivalent to `stamp_merkle_metadata` followed
-    by `sign_if_configured`; the ordering matters (the signature covers the
-    stamped metadata) and is easy to get backwards when open-coded per writer.
-
-    Callers MUST surface a `failed` attempt. `unconfigured` is normal until a
-    signing key is provisioned and needs no output.
-    """
-    dropped = stamp_merkle_metadata(layer)
-    attempt = sign_if_configured(layer, config, rekor=rekor)
-    if dropped and attempt.status != "signed":
-        # Re-signing supersedes the drop; only an unsigned outcome leaves the
-        # layer de-attested, and that is what the caller has to hear about.
-        attempt = replace(attempt, stale_signature_dropped=True)
-    return attempt
 
 
 def verify_restated_metadata(layer: dict) -> list[IntegrityFinding]:
@@ -628,18 +594,6 @@ def verify_merkle_signature(
                 ),
             )
         ]
-    if not signer.can_verify:
-        return [
-            IntegrityFinding(
-                severity=Severity.WARNING,
-                message=(
-                    "merkle_root_signature present but no "
-                    f"{signer.method_name} verification policy configured "
-                    "(expected_identity and oidc_issuer) — pass a backend "
-                    "configured for identity verification, backend="
-                ),
-            )
-        ]
     sig_format = meta.get("merkle_signature_format", 1)
     format_findings: list[IntegrityFinding] = []
     if sig_format == SIGNATURE_FORMAT_CURRENT:
@@ -677,8 +631,8 @@ def verify_merkle_signature(
                     "LEGACY SIGNATURE FORMAT (v1): the signature binds only "
                     "the bare 32-byte root — leaf_format, epoch, and claim "
                     "pins are unbound, so rollback to a previously-signed "
-                    "state or re-scoping the tree verifies cleanly. Re-sign "
-                    "the layer (sign_merkle_root.py sign) to upgrade."
+                    "state or re-scoping the tree verifies cleanly. Re-stamp "
+                    "and re-sign the layer from its writer to upgrade."
                 ),
             )
         )

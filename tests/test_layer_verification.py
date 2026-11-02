@@ -5,9 +5,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-import sys
 from pathlib import Path
-from unittest import mock
 
 import pytest
 
@@ -16,7 +14,7 @@ from traust_ledger.integrity import (
     SigningBackend,
     SigningConfig,
     VerifyResult,
-    stamp_and_sign,
+    sign_if_configured,
     stamp_merkle_metadata,
     verify_merkle_integrity,
     verify_merkle_signature,
@@ -59,38 +57,6 @@ def errors(findings: list) -> list[str]:
     return [f.message for f in findings if f.severity is Severity.ERROR]
 
 
-def test_verify_merkle_signature_identity_without_policy_reports_unconfigured_not_failed() -> None:
-    """An identity-signed layer with no verifier policy is unconfigured, not tampered.
-
-    sign_if_configured/stamp_and_sign write merkle_signing_method='identity' layers;
-    the standard entry point (no explicit backend=, exactly how traust-core calls it)
-    dispatches them to a bare SigstoreOIDCBackend(), which structurally cannot
-    verify. That must surface as an unconfigured-verifier WARNING — the keypair
-    analogue of "no public key configured" — not as an ERROR claiming the
-    signature failed verification, which is tamper-evidence language.
-    """
-    signed = layer()
-    stamp_merkle_metadata(signed)
-    signed["metadata"]["merkle_signing_method"] = "identity"
-    signed["metadata"]["merkle_signature_format"] = 4
-    signed["metadata"]["merkle_root_signature"] = "fake-bundle"
-
-    with mock.patch.dict(
-        sys.modules,
-        {
-            "sigstore": mock.MagicMock(),
-            "sigstore.verify": mock.MagicMock(),
-            "sigstore.models": mock.MagicMock(),
-        },
-    ):
-        findings = verify_merkle_signature(signed, pubkey_path="/tmp/irrelevant.pub")
-
-    assert not errors(findings), errors(findings)
-    assert any(f.severity is Severity.WARNING and "identity" in f.message for f in findings), [
-        f"{f.severity}: {f.message}" for f in findings
-    ]
-
-
 class _StubBackend(SigningBackend):
     """Backend that says yes to everything, so the test isolates the payload path."""
 
@@ -101,7 +67,7 @@ class _StubBackend(SigningBackend):
     def available(self) -> bool:
         return True
 
-    def sign(self, payload: bytes, key_path: str, *, rekor: bool = False):
+    def sign(self, payload: bytes, key_path: str):
         raise NotImplementedError
 
     def verify(self, payload: bytes, signature: str, key_path: str) -> VerifyResult:
@@ -134,7 +100,8 @@ def test_verify_merkle_signature_non_hex_root_is_finding_not_crash() -> None:
 def test_a_signed_chain_verifies_and_a_tampered_event_does_not(keys) -> None:
     (private, public), _ = keys
     doc = layer(event(0), event(1), event(2))
-    attempt = stamp_and_sign(doc, SigningConfig(method="keypair", key_path=private))
+    stamp_merkle_metadata(doc)
+    attempt = sign_if_configured(doc, SigningConfig(method="keypair", key_path=private))
     assert attempt.status == "signed", attempt.error
     assert verify_merkle_integrity(doc) == []
     assert verify_merkle_signature(doc, public) == []
@@ -147,7 +114,8 @@ def test_a_signed_chain_verifies_and_a_tampered_event_does_not(keys) -> None:
 def test_a_signature_from_another_key_is_rejected(keys) -> None:
     (private, _), (_, their_public) = keys
     doc = layer(event(0))
-    stamp_and_sign(doc, SigningConfig(method="keypair", key_path=private))
+    stamp_merkle_metadata(doc)
+    sign_if_configured(doc, SigningConfig(method="keypair", key_path=private))
     assert verify_merkle_integrity(doc) == []
     assert errors(verify_merkle_signature(doc, their_public))
 
