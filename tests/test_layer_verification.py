@@ -13,7 +13,9 @@ import pytest
 
 from traust_ledger.integrity import (
     Severity,
+    SigningBackend,
     SigningConfig,
+    VerifyResult,
     stamp_and_sign,
     stamp_merkle_metadata,
     verify_merkle_integrity,
@@ -85,6 +87,45 @@ def test_verify_merkle_signature_identity_without_policy_reports_unconfigured_no
 
     assert not errors(findings), errors(findings)
     assert any(f.severity is Severity.WARNING and "identity" in f.message for f in findings), [
+        f"{f.severity}: {f.message}" for f in findings
+    ]
+
+
+class _StubBackend(SigningBackend):
+    """Backend that says yes to everything, so the test isolates the payload path."""
+
+    @property
+    def method_name(self) -> str:
+        return "keypair"
+
+    def available(self) -> bool:
+        return True
+
+    def sign(self, payload: bytes, key_path: str, *, rekor: bool = False):
+        raise NotImplementedError
+
+    def verify(self, payload: bytes, signature: str, key_path: str) -> VerifyResult:
+        return VerifyResult(valid=True)
+
+
+def test_verify_merkle_signature_non_hex_root_is_finding_not_crash() -> None:
+    """A malformed merkle_root must be a finding, never an escaping exception.
+
+    sig_format defaults to 1 when merkle_signature_format is absent, and the
+    format-1 path feeds untrusted metadata.merkle_root straight into
+    bytes.fromhex — a tampered layer with a non-hex root crashed the verifier
+    (uncaught, straight through traust-core's LedgerService._issues) instead
+    of returning an IntegrityFinding like every sibling malformed field.
+    """
+    layer = {
+        "metadata": {
+            "merkle_root": "definitely-not-hex",
+            "merkle_root_signature": "c2ln",
+        },
+        "events": [],
+    }
+    findings = verify_merkle_signature(layer, pubkey_path="/tmp/pub.pub", backend=_StubBackend())
+    assert any(f.severity is Severity.ERROR and "merkle_root" in f.message for f in findings), [
         f"{f.severity}: {f.message}" for f in findings
     ]
 

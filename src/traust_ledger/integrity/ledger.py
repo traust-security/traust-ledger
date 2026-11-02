@@ -657,7 +657,19 @@ def verify_merkle_signature(
         # hashes — only audit_report_sha256 is outside it.
         payload = merkle_signature_payload(meta, fmt=2)
     elif sig_format == 1:
-        payload = merkle_root_payload(merkle_root)
+        try:
+            payload = merkle_root_payload(merkle_root)
+        except ValueError:
+            return [
+                IntegrityFinding(
+                    severity=Severity.ERROR,
+                    message=(
+                        f"metadata.merkle_root {merkle_root!r} is not a hex "
+                        "string — cannot reconstruct the legacy format-1 "
+                        "signed payload"
+                    ),
+                )
+            ]
         format_findings.append(
             IntegrityFinding(
                 severity=Severity.WARNING,
