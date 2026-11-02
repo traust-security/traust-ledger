@@ -326,7 +326,19 @@ def verify_merkle_integrity(layer: dict) -> list[IntegrityFinding]:
         )
         return findings
 
-    epoch = int(meta.get("merkle_epoch", 0))
+    try:
+        epoch = int(meta.get("merkle_epoch", 0))
+    except (TypeError, ValueError):
+        findings.append(
+            IntegrityFinding(
+                severity=Severity.ERROR,
+                message=(
+                    f"metadata.merkle_epoch {meta.get('merkle_epoch')!r} is "
+                    f"not an integer — invalid"
+                ),
+            )
+        )
+        return findings
     if epoch < 0:
         findings.append(
             IntegrityFinding(
