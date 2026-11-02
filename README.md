@@ -7,10 +7,16 @@ A **layer** is an append-only, signed sequence of events: never edited, only app
 ## Use
 
 ```python
-from traust_ledger.integrity import SigningConfig, stamp_and_sign, verify_merkle_integrity
+from traust_ledger.integrity import (
+    SigningConfig,
+    sign_if_configured,
+    stamp_merkle_metadata,
+    verify_merkle_integrity,
+)
 
 layer = {"events": [{"id": "...", "validity": "false_positive"}], "metadata": {}}
-attempt = stamp_and_sign(layer, SigningConfig(method="keypair", key_path="cosign.key"))
+stamp_merkle_metadata(layer)  # recompute root; a changed root drops a stale signature
+attempt = sign_if_configured(layer, SigningConfig(method="keypair", key_path="cosign.key"))
 assert verify_merkle_integrity(layer) == []
 ```
 
@@ -25,7 +31,7 @@ Consumers pin by commit SHA; there are no releases or tags:
 traust-ledger = { git = "https://github.com/traust-security/traust-ledger.git", rev = "<sha>" }
 ```
 
-Keypair signing shells out to [cosign](https://github.com/sigstore/cosign) 3; keyless (`identity`) signing imports `sigstore` when it's installed.
+Signing shells out to [cosign](https://github.com/sigstore/cosign) 3 with a private key; offline, no transparency-log upload.
 
 ## Development
 

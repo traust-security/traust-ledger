@@ -75,7 +75,7 @@ class HmacTestBackend(SigningBackend):
     def available(self) -> bool:
         return True
 
-    def sign(self, payload: bytes, key_path: str, *, rekor: bool = False) -> SignResult:
+    def sign(self, payload: bytes, key_path: str) -> SignResult:
         sig = hmac.new(self._secret, payload, "sha256").digest()
         return SignResult(signature=base64.b64encode(sig).decode(), success=True)
 

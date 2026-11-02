@@ -1,4 +1,4 @@
-"""Write-path signing: sign_if_configured / stamp_and_sign.
+"""Write-path signing: stamp_merkle_metadata / sign_if_configured.
 
 Until this was wired, nothing in any write path invoked the signer — signing
 existed only in a separate CLI — so no stored layer carried a signature.
@@ -15,7 +15,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from traust_ledger.integrity import (
     sign_if_configured,
-    stamp_and_sign,
     stamp_merkle_metadata,
 )
 from traust_ledger.integrity.signing import SigningConfig
@@ -44,7 +43,8 @@ def test_unconfigured_is_a_silent_noop():
     """The state the harness is in until a key is provisioned. Wiring the
     call site must not break any writer while the key is unset."""
     L = _layer()
-    attempt = stamp_and_sign(L, UNCONFIGURED)
+    stamp_merkle_metadata(L)
+    attempt = sign_if_configured(L, UNCONFIGURED)
     assert attempt.status == "unconfigured"
     assert attempt.configured is False
     assert attempt.error is None
@@ -57,7 +57,7 @@ def test_configured_but_broken_reports_failed_and_writes_nothing():
     how a ledger ends up unsigned while everyone believes it is signed."""
     L = _layer()
     cfg = SigningConfig(method="keypair", key_path="/nonexistent/key.pem")
-    stamp_and_sign(L, UNCONFIGURED)  # stamp first
+    stamp_merkle_metadata(L)
     attempt = sign_if_configured(L, cfg)
     assert attempt.status == "failed"
     assert attempt.configured is True
@@ -75,18 +75,9 @@ def test_signing_before_stamping_is_refused():
     assert "stamp_merkle_metadata" in (attempt.error or "")
 
 
-def test_identity_without_a_token_is_unconfigured_not_interactive():
-    """A batch writer must never fall into an interactive OIDC flow."""
-    L = _layer()
-    stamp_and_sign(L, UNCONFIGURED)
-    attempt = sign_if_configured(L, SigningConfig(method="identity", oidc_token=None))
-    assert attempt.status == "unconfigured"
-    assert attempt.method == "identity"
-
-
-def test_stamp_and_sign_stamps_at_current_leaf_format():
+def test_stamping_uses_the_current_leaf_format():
     L = _layer(3)
-    stamp_and_sign(L, UNCONFIGURED)
+    stamp_merkle_metadata(L)
     assert L["metadata"]["leaf_format"] == 2
     assert L["metadata"]["merkle_size"] == 3
 
@@ -146,20 +137,11 @@ def test_stamp_keeps_a_signature_the_root_still_matches():
     assert L["metadata"]["merkle_signing_method"] == "keypair"
 
 
-def test_stamp_and_sign_reports_the_drop_when_it_cannot_re_sign():
-    L = _signed_layer()
-    _append_event(L)
-
-    attempt = stamp_and_sign(L, UNCONFIGURED)  # no key in the config
-
-    assert attempt.status == "unconfigured"
-    assert attempt.stale_signature_dropped is True
-    assert "UNSIGNED" in attempt.warning()
-
-
 def test_warning_is_none_on_a_clean_unconfigured_write():
     """The pre-P8 normal case stays quiet — nothing was lost."""
-    attempt = stamp_and_sign(_layer(), UNCONFIGURED)
+    L = _layer()
+    stamp_merkle_metadata(L)
+    attempt = sign_if_configured(L, UNCONFIGURED)
 
     assert attempt.status == "unconfigured"
     assert attempt.stale_signature_dropped is False

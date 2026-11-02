@@ -125,7 +125,6 @@ class TestCosignBackend(unittest.TestCase):
         result = CosignBackend().sign(
             merkle_root_payload(ROOT),
             "/tmp/key.pem",
-            rekor=True,
         )
         self.assertTrue(result.success)
         self.assertTrue(result.signature.startswith("{"), "must be a bundle")
@@ -136,15 +135,15 @@ class TestCosignBackend(unittest.TestCase):
         self.assertEqual(cmd[:4], ["cosign", "sign-blob", "--key", "/tmp/key.pem"])
         self.assertIn("--bundle", cmd)
         self.assertNotIn("--output-signature", cmd, "v3 hard-fails on this flag")
-        self.assertNotIn("--tlog-upload=false", cmd, "rekor=True keeps the log")
+        self.assertIn("--tlog-upload=false", cmd, "publication is never allowed")
         # The payload is a real file now; nothing is piped on stdin.
         self.assertNotIn("input", run.call_args.kwargs)
 
     @mock.patch(f"{_SIGNING_MOD}.shutil.which", return_value="/usr/bin/cosign")
     @mock.patch(f"{_SIGNING_MOD}.subprocess.run")
-    def test_sign_without_rekor_disables_tlog(self, run, _which):
+    def test_sign_disables_tlog(self, run, _which):
         run.return_value = mock.Mock(returncode=0, stdout=SIG.encode(), stderr=b"")
-        CosignBackend().sign(merkle_root_payload(ROOT), "/tmp/key.pem", rekor=False)
+        CosignBackend().sign(merkle_root_payload(ROOT), "/tmp/key.pem")
         cmd = run.call_args.args[0]
         self.assertIn("--tlog-upload=false", cmd)
 
@@ -312,7 +311,7 @@ def test_absent_digest_is_signed_as_a_distinct_value():
 
 
 def test_new_signatures_record_the_current_format(tmp_path, monkeypatch):
-    """stamp_and_sign records the current format, whatever it is.
+    """sign_if_configured records the current format, whatever it is.
 
     This asserted `== 3` literally and had to be edited when format 4 landed — the
     same trap two fixtures hit during the format-3 migration. A test that pins a

@@ -11,8 +11,10 @@ import pytest
 
 from traust_ledger.integrity import (
     Severity,
+    SigningBackend,
     SigningConfig,
-    stamp_and_sign,
+    VerifyResult,
+    sign_if_configured,
     stamp_merkle_metadata,
     verify_merkle_integrity,
     verify_merkle_signature,
@@ -55,11 +57,52 @@ def errors(findings: list) -> list[str]:
     return [f.message for f in findings if f.severity is Severity.ERROR]
 
 
+class _StubBackend(SigningBackend):
+    """Backend that says yes to everything, so the test isolates the payload path."""
+
+    @property
+    def method_name(self) -> str:
+        return "keypair"
+
+    def available(self) -> bool:
+        return True
+
+    def sign(self, payload: bytes, key_path: str):
+        raise NotImplementedError
+
+    def verify(self, payload: bytes, signature: str, key_path: str) -> VerifyResult:
+        return VerifyResult(valid=True)
+
+
+@pytest.mark.parametrize("bad_root", ["definitely-not-hex", 5])
+def test_verify_merkle_signature_non_hex_root_is_finding_not_crash(bad_root: object) -> None:
+    """A malformed merkle_root must be a finding, never an escaping exception.
+
+    sig_format defaults to 1 when merkle_signature_format is absent, and the
+    format-1 path feeds untrusted metadata.merkle_root straight into
+    bytes.fromhex — a tampered layer with a non-hex root crashed the verifier
+    (uncaught, straight through traust-core's LedgerService._issues) instead
+    of returning an IntegrityFinding like every sibling malformed field.
+    """
+    layer = {
+        "metadata": {
+            "merkle_root": bad_root,
+            "merkle_root_signature": "c2ln",
+        },
+        "events": [],
+    }
+    findings = verify_merkle_signature(layer, pubkey_path="/tmp/pub.pub", backend=_StubBackend())
+    assert any(f.severity is Severity.ERROR and "merkle_root" in f.message for f in findings), [
+        f"{f.severity}: {f.message}" for f in findings
+    ]
+
+
 @needs_cosign
 def test_a_signed_chain_verifies_and_a_tampered_event_does_not(keys) -> None:
     (private, public), _ = keys
     doc = layer(event(0), event(1), event(2))
-    attempt = stamp_and_sign(doc, SigningConfig(method="keypair", key_path=private))
+    stamp_merkle_metadata(doc)
+    attempt = sign_if_configured(doc, SigningConfig(method="keypair", key_path=private))
     assert attempt.status == "signed", attempt.error
     assert verify_merkle_integrity(doc) == []
     assert verify_merkle_signature(doc, public) == []
@@ -72,7 +115,8 @@ def test_a_signed_chain_verifies_and_a_tampered_event_does_not(keys) -> None:
 def test_a_signature_from_another_key_is_rejected(keys) -> None:
     (private, _), (_, their_public) = keys
     doc = layer(event(0))
-    stamp_and_sign(doc, SigningConfig(method="keypair", key_path=private))
+    stamp_merkle_metadata(doc)
+    sign_if_configured(doc, SigningConfig(method="keypair", key_path=private))
     assert verify_merkle_integrity(doc) == []
     assert errors(verify_merkle_signature(doc, their_public))
 

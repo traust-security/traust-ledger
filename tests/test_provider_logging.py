@@ -3,14 +3,13 @@ from __future__ import annotations
 import json
 import logging
 import subprocess
-import sys
 from pathlib import Path
 from unittest import mock
 
 import pytest
 
 from traust_ledger.integrity import signing
-from traust_ledger.integrity.signing import CosignBackend, SigstoreOIDCBackend
+from traust_ledger.integrity.signing import CosignBackend
 
 LOGGER = "traust_ledger.integrity.signing"
 SECRET = "synthetic-secret-never-log"
@@ -98,62 +97,6 @@ def test_cosign_success_and_invalid_signature_each_emit_one_terminal_event(
     assert SECRET not in caplog.text
 
 
-def test_identity_provider_failure_omits_token_and_exception(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    backend = SigstoreOIDCBackend(oidc_token=SECRET)
-    monkeypatch.setattr(signing, "_sigstore_importable", lambda: True)
-    monkeypatch.setattr(backend, "_resolve_identity_token", lambda: object())
-
-    def fail() -> object:
-        raise RuntimeError(SECRET)
-
-    monkeypatch.setattr(backend, "_build_signing_context", fail)
-    with caplog.at_level(logging.INFO, logger=LOGGER):
-        outcome = backend.sign(b"private document", "")
-    record = event(caplog)
-    assert not outcome.success and SECRET in (outcome.error or "")
-    assert (record.provider, record.method, record.outcome, record.reason) == (
-        "sigstore",
-        "identity",
-        "failed",
-        "provider_error",
-    )
-    assert SECRET not in caplog.text and "private document" not in caplog.text
-
-
-def test_identity_missing_credential_and_invalid_bundle_have_bounded_reasons(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    backend = SigstoreOIDCBackend()
-    monkeypatch.setattr(signing, "_sigstore_importable", lambda: True)
-    monkeypatch.setattr(backend, "_resolve_identity_token", lambda: None)
-    with caplog.at_level(logging.INFO, logger=LOGGER):
-        missing = backend.sign(b"payload", "")
-    assert not missing.success
-    assert event(caplog).reason == "credential_unavailable"
-
-    caplog.clear()
-    models = mock.MagicMock()
-    models.Bundle.from_json.side_effect = ValueError(SECRET)
-    with (
-        mock.patch.dict(
-            sys.modules,
-            {
-                "sigstore": mock.MagicMock(),
-                "sigstore.models": models,
-                "sigstore.verify": mock.MagicMock(),
-            },
-        ),
-        caplog.at_level(logging.INFO, logger=LOGGER),
-    ):
-        invalid = backend.verify(b"private payload", f"bundle-{SECRET}", "")
-    record = event(caplog)
-    assert not invalid.valid and SECRET in (invalid.error or "")
-    assert (record.outcome, record.reason) == ("invalid", "invalid_bundle")
-    assert SECRET not in caplog.text and "private payload" not in caplog.text
-
-
 @pytest.mark.parametrize(
     ("bundle_text", "outcome", "reason"),
     [
@@ -217,105 +160,10 @@ def test_logging_failure_does_not_replace_provider_result(
 def test_logging_failure_does_not_replace_provider_exception(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fail_import_check() -> bool:
+    def fail_run(*_: object, **__: object) -> object:
         raise RuntimeError(SECRET)
 
-    monkeypatch.setattr(signing, "_sigstore_importable", fail_import_check)
+    monkeypatch.setattr(subprocess, "run", fail_run)
     monkeypatch.setattr(signing.log, "log", mock.Mock(side_effect=KeyError("operation")))
     with pytest.raises(RuntimeError, match=SECRET):
-        SigstoreOIDCBackend().sign(b"private payload", "")
-
-
-def test_unexpected_sigstore_setup_error_emits_once_then_reraises(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    def fail_import_check() -> bool:
-        raise RuntimeError(SECRET)
-
-    monkeypatch.setattr(signing, "_sigstore_importable", fail_import_check)
-    with (
-        caplog.at_level(logging.INFO, logger=LOGGER),
-        pytest.raises(RuntimeError, match=SECRET),
-    ):
-        SigstoreOIDCBackend().sign(b"private payload", "")
-    record = event(caplog)
-    assert (record.outcome, record.reason) == ("failed", "unexpected_error")
-    assert SECRET not in caplog.text and "private payload" not in caplog.text
-
-
-def test_identity_dependency_and_configuration_refusals_are_bounded(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    backend = SigstoreOIDCBackend()
-    monkeypatch.setattr(signing, "_sigstore_importable", lambda: False)
-    with caplog.at_level(logging.INFO, logger=LOGGER):
-        unavailable = backend.sign(b"payload", "")
-    assert not unavailable.success
-    assert (event(caplog).outcome, event(caplog).reason) == (
-        "refused",
-        "dependency_unavailable",
-    )
-
-    caplog.clear()
-    monkeypatch.setattr(signing, "_sigstore_importable", lambda: True)
-    backend = SigstoreOIDCBackend(ca_url=f"https://{SECRET}.invalid")
-    with caplog.at_level(logging.INFO, logger=LOGGER):
-        invalid = backend.sign(b"payload", "")
-    record = event(caplog)
-    assert not invalid.success
-    assert (record.outcome, record.reason) == ("refused", "invalid_configuration")
-    assert SECRET not in caplog.text
-
-
-def test_identity_verification_terminal_outcomes_are_distinct(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    models = mock.MagicMock()
-    models.Bundle.from_json.return_value = object()
-    verify = mock.MagicMock()
-    modules = {
-        "sigstore": mock.MagicMock(),
-        "sigstore.models": models,
-        "sigstore.verify": verify,
-    }
-
-    with mock.patch.dict(sys.modules, modules), caplog.at_level(logging.INFO, logger=LOGGER):
-        missing_policy = SigstoreOIDCBackend().verify(b"payload", "bundle", "")
-    assert not missing_policy.valid
-    assert (event(caplog).outcome, event(caplog).reason) == (
-        "refused",
-        "identity_policy_unavailable",
-    )
-
-    caplog.clear()
-    backend = SigstoreOIDCBackend(
-        expected_identity="subject@example.test", oidc_issuer="https://issuer.example.test"
-    )
-    verifier = mock.MagicMock()
-    monkeypatch.setattr(backend, "_build_verifier", lambda: verifier)
-    with mock.patch.dict(sys.modules, modules), caplog.at_level(logging.INFO, logger=LOGGER):
-        verified = backend.verify(b"payload", "bundle", "")
-    assert verified.valid
-    assert (event(caplog).outcome, event(caplog).reason) == ("verified", "completed")
-
-    caplog.clear()
-    verifier.verify_artifact.side_effect = RuntimeError(SECRET)
-    with mock.patch.dict(sys.modules, modules), caplog.at_level(logging.INFO, logger=LOGGER):
-        rejected = backend.verify(b"private payload", f"bundle-{SECRET}", "")
-    record = event(caplog)
-    assert not rejected.valid and SECRET in (rejected.error or "")
-    assert (record.outcome, record.reason) == ("invalid", "verification_rejected")
-    assert SECRET not in caplog.text and "private payload" not in caplog.text
-
-    caplog.clear()
-
-    def fail_verifier() -> object:
-        raise RuntimeError(SECRET)
-
-    monkeypatch.setattr(backend, "_build_verifier", fail_verifier)
-    with mock.patch.dict(sys.modules, modules), caplog.at_level(logging.INFO, logger=LOGGER):
-        failed = backend.verify(b"private payload", f"bundle-{SECRET}", "")
-    record = event(caplog)
-    assert not failed.valid and SECRET in (failed.error or "")
-    assert (record.outcome, record.reason) == ("failed", "provider_error")
-    assert SECRET not in caplog.text and "private payload" not in caplog.text
+        CosignBackend().sign(b"private payload", f"/{SECRET}.key")
