@@ -628,6 +628,18 @@ def verify_merkle_signature(
                 ),
             )
         ]
+    if not signer.can_verify:
+        return [
+            IntegrityFinding(
+                severity=Severity.WARNING,
+                message=(
+                    "merkle_root_signature present but no "
+                    f"{signer.method_name} verification policy configured "
+                    "(expected_identity and oidc_issuer) — pass a backend "
+                    "configured for identity verification, backend="
+                ),
+            )
+        ]
     sig_format = meta.get("merkle_signature_format", 1)
     format_findings: list[IntegrityFinding] = []
     if sig_format == SIGNATURE_FORMAT_CURRENT:

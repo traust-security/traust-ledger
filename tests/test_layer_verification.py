@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -53,6 +55,38 @@ def restatement(target: str, after: object, n: int = 9) -> dict:
 
 def errors(findings: list) -> list[str]:
     return [f.message for f in findings if f.severity is Severity.ERROR]
+
+
+def test_verify_merkle_signature_identity_without_policy_reports_unconfigured_not_failed() -> None:
+    """An identity-signed layer with no verifier policy is unconfigured, not tampered.
+
+    sign_if_configured/stamp_and_sign write merkle_signing_method='identity' layers;
+    the standard entry point (no explicit backend=, exactly how traust-core calls it)
+    dispatches them to a bare SigstoreOIDCBackend(), which structurally cannot
+    verify. That must surface as an unconfigured-verifier WARNING — the keypair
+    analogue of "no public key configured" — not as an ERROR claiming the
+    signature failed verification, which is tamper-evidence language.
+    """
+    signed = layer()
+    stamp_merkle_metadata(signed)
+    signed["metadata"]["merkle_signing_method"] = "identity"
+    signed["metadata"]["merkle_signature_format"] = 4
+    signed["metadata"]["merkle_root_signature"] = "fake-bundle"
+
+    with mock.patch.dict(
+        sys.modules,
+        {
+            "sigstore": mock.MagicMock(),
+            "sigstore.verify": mock.MagicMock(),
+            "sigstore.models": mock.MagicMock(),
+        },
+    ):
+        findings = verify_merkle_signature(signed, pubkey_path="/tmp/irrelevant.pub")
+
+    assert not errors(findings), errors(findings)
+    assert any(f.severity is Severity.WARNING and "identity" in f.message for f in findings), [
+        f"{f.severity}: {f.message}" for f in findings
+    ]
 
 
 @needs_cosign

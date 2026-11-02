@@ -159,6 +159,17 @@ class SigningBackend(abc.ABC):
         """Check if this backend's tooling is available."""
         ...
 
+    @property
+    def can_verify(self) -> bool:
+        """True when the backend holds a verification policy, besides its key.
+
+        Key material (pubkey_path) arrives per call; a policy (identity
+        expected_identity/oidc_issuer) is configuration the backend is built
+        with. A backend that cannot verify must be reported as unconfigured,
+        not as a failed verification.
+        """
+        return True
+
     @abc.abstractmethod
     def sign(self, payload: bytes, key_path: str, *, rekor: bool = False) -> SignResult:
         """Sign payload bytes, return base64 signature."""
@@ -424,6 +435,10 @@ class SigstoreOIDCBackend(SigningBackend):
 
     def available(self) -> bool:
         return _sigstore_importable()
+
+    @property
+    def can_verify(self) -> bool:
+        return bool(self._expected_identity and self._oidc_issuer)
 
     def _validate_custom_urls(self) -> str | None:
         """Return an error string if custom URL config is invalid, else None."""
