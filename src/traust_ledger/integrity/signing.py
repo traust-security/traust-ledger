@@ -107,7 +107,7 @@ def _terminal(
 
 @dataclass
 class SignResult:
-    signature: str  # base64-encoded signature or JSON bundle (OIDC)
+    signature: str  # base64-encoded signature or JSON bundle
     success: bool
     error: str | None = None
 

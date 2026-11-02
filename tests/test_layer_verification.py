@@ -74,7 +74,8 @@ class _StubBackend(SigningBackend):
         return VerifyResult(valid=True)
 
 
-def test_verify_merkle_signature_non_hex_root_is_finding_not_crash() -> None:
+@pytest.mark.parametrize("bad_root", ["definitely-not-hex", 5])
+def test_verify_merkle_signature_non_hex_root_is_finding_not_crash(bad_root: object) -> None:
     """A malformed merkle_root must be a finding, never an escaping exception.
 
     sig_format defaults to 1 when merkle_signature_format is absent, and the
@@ -85,7 +86,7 @@ def test_verify_merkle_signature_non_hex_root_is_finding_not_crash() -> None:
     """
     layer = {
         "metadata": {
-            "merkle_root": "definitely-not-hex",
+            "merkle_root": bad_root,
             "merkle_root_signature": "c2ln",
         },
         "events": [],

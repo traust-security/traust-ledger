@@ -294,7 +294,7 @@ def verify_merkle_integrity(layer: dict) -> list[IntegrityFinding]:
 
     try:
         epoch = int(meta.get("merkle_epoch", 0))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         findings.append(
             IntegrityFinding(
                 severity=Severity.ERROR,
@@ -335,7 +335,7 @@ def verify_merkle_integrity(layer: dict) -> list[IntegrityFinding]:
     leaf_format = meta.get("leaf_format", 1)
     try:
         leaf_format = int(leaf_format)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         leaf_format = -1
     if leaf_format not in (1, LEAF_FORMAT_CURRENT):
         findings.append(
@@ -613,7 +613,7 @@ def verify_merkle_signature(
     elif sig_format == 1:
         try:
             payload = merkle_root_payload(merkle_root)
-        except ValueError:
+        except (TypeError, ValueError):
             return [
                 IntegrityFinding(
                     severity=Severity.ERROR,
