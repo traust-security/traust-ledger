@@ -1,6 +1,6 @@
 [project]
 name = "traust-ledger"
-version = "0.0.0"  # consumers pin by commit SHA; no releases
+version = "0.1.0"
 license = "Apache-2.0"
 description = "Ledger integrity primitives: canonical event bytes, Merkle trees, signing and verification"
 requires-python = ">=3.11"
