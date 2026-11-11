@@ -1,123 +1,61 @@
 # Ledger integrity
 
-What guarantees a layer is tamper-evident and who-acted is preserved.
+What makes a layer tamper-evident, and what `traust_ledger.integrity` checks. The library computes; the caller (traust-core's `LedgerService`) stores layers and events and decides what goes in an event.
 
-## The invariant
+## The layer document
 
-The identity port (service layer) proves **who called the API**. This document
-covers what happens **after** identity is proven: how the actor lands in the
-ledger's integrity structure so it can be verified independently of the service
-that wrote it.
-
-## Write paths and their integrity guarantees
-
-All three entry points (LedgerClient, CLI, REST API) converge on the same
-handlers (`traust_ledger.handlers.*`), which call `LedgerWriter` and
-`sign_handler.sign_layer()`. The integrity guarantees are identical regardless
-of entry point.
-
-### Events (`POST /v1/ledger/events` / `LedgerClient.submit()` / `ledger submit`)
-
-```
-identity gate → resolve actor → domain gates → stamp actor on event source
-→ append event → recompute Merkle → sign root (if configured) → persist
-```
-
-The actor from the identity port is:
-1. Copied defensively (`model_copy`)
-2. Checked against domain gates (human required, verified for FP, two-person)
-3. Stamped into `event.source.actor` — this is the Merkle leaf content
-4. The `event_id` is derived from the actor + timestamp + finding ref
-
-If signing is required and fails, the write is rejected. No unsigned event can
-land when `LAAS_SIGNING_REQUIRED=true`.
-
-### Reports (`POST /v1/ledger/reports`)
-
-```
-identity gate → converter produces events with machine actor → append events
-→ recompute Merkle → sign root → persist
-```
-
-Reports are machine-lane. The converter stamps its own `LayerActor(kind="machine")`
-from report content — the authenticated caller's identity gates access but does
-not override what the converter stamps. This is deliberate: the provenance of a
-machine report is the scanner that produced it, not the transport identity.
-
-## Fail-closed enforcement
-
-| Check | Where | Failure mode |
-|---|---|---|
-| Identity required | `require_identity` / `resolve_actor` in route deps | 401 before handler |
-| Signing required | `require_signing_configured` at handler entry | Startup error if key missing |
-| Signing on write | `finalize_layer` after Merkle recompute | 422 if sign fails with `signing_required=true` |
-| Human identity | `require_human_identity` | 422 if human event lacks identity |
-| Verified for FP | `require_verified_for_false_positive` | 422 if unverified |
-| Two-person rule | `require_two_person` | 422 if same signer |
-| Machine exclusion | `reject_machine_human_lane` | 422 if machine on human lane |
-
-All write gates are fail-closed: missing configuration or invalid state
-**rejects** the write, never degrades silently.
-
-## What the Merkle leaf contains
-
-Each event in the layer carries:
+Every function reads and stamps one shape:
 
 ```json
 {
-  "source": {
-    "type": "interactive" | "automated",
-    "ref": "...",
-    "actor": {
-      "kind": "human" | "machine",
-      "identity": "alice@example.com",
-      "identity_verified": true,
-      "identity_provider": "oidc",
-      "identity_issuer": "https://sso.example.com/realms/prod",
-      "identity_subject": "alice@example.com",
-      "employee_status": "active"
-    }
+  "events": [{"...": "one decision, any JSON object"}],
+  "metadata": {
+    "merkle_root": "hex", "merkle_size": 3, "merkle_epoch": 0, "leaf_format": 2,
+    "merkle_root_signature": "cosign bundle", "merkle_signing_method": "keypair",
+    "merkle_signature_format": 4
   }
 }
 ```
 
-The Merkle tree covers this content. Tampering with the actor, the event
-payload, or the order of events invalidates the root. The signature over the
-root makes this externally verifiable.
+## Leaves and root
 
-## `event_id` derivation
+- **Leaf format 2** (current): each leaf is `canonical_event_bytes(event)`: the whole event, sorted keys, compact separators, `merkle_*` keys excluded so stamping can't invalidate itself. Editing any field, removing an event or reordering events changes the root.
+- **Leaf format 1** (legacy): leaves bind `event_id` only. Still verifies, always with an error saying event content isn't bound.
+- The tree is RFC 6962-style (`0x00` leaf / `0x01` node prefixes), with inclusion and consistency proofs.
+- `merkle_epoch > 0` pins events before the epoch with `pre_merkle_checkpoint` (a digest of them).
 
-`event_id` includes the actor identity:
-`{source_type}:{date}:{actor.identity}` for interactive events. This ties the
-event's identity to its content hash — changing who-acted changes the ID.
+### Appending without rereading
 
-## Merkle-root signing
+`extend_frontier(frontier, size, entry)` appends one leaf to a tree from its frontier: the roots of the perfect subtrees covering its leaves, largest first, one per set bit of the size (at most log2(size) hashes). `frontier_root(frontier)` is the same root `compute_root` gives over every leaf; `compute_frontier(entries)` builds the frontier of an existing tree once. A writer that keeps the frontier appends in O(log n) and never reads earlier leaves, so an edit to a stored event can't be folded into the next root: it stays a mismatch for verification to find.
 
-| Variable | Default | What it does |
-|---|---|---|
-| `LAAS_SIGNING_REQUIRED` | `false` | Unsigned writes fail when true |
-| `LAAS_SIGNING_METHOD` | `keypair` | `keypair` (cosign) or `sigstore-oidc` (keyless) |
-| `LAAS_SIGNING_KEY_PATH` | *(unset)* | Cosign private key path |
-| `LAAS_SIGNING_CA_URL` / `LAAS_SIGNING_TLOG_URL` | *(unset)* | Private Fulcio/Rekor endpoints |
+## Stamping and signing
 
-Both `LAAS_SIGNING_*` and `HARNESS_SIGNING_*` prefixes are honoured (legacy).
+| Function | Does |
+|---|---|
+| `stamp_merkle_metadata(layer)` | recomputes root and size; a changed root drops a stale signature (returns `True`) |
+| `sign_if_configured(layer, config)` | signs the stamped metadata when `config` has a key; else `unconfigured`. Never silent on failure |
 
-> **The default is unsigned.** Set both `LAAS_SIGNING_KEY_PATH` and
-> `LAAS_SIGNING_REQUIRED=true` for any real deployment. Setting only the key
-> path means a broken mount degrades silently; setting only `REQUIRED` fails
-> loudly.
+A writer that appends from a frontier sets `merkle_root` and `merkle_size` itself (`frontier_root`) and calls `sign_if_configured` on a document with only the metadata: signing never reads events. The frontier is the writer's to store (traust-core keeps it on the layer row); it isn't part of the document.
 
-## What's not pluggable
+The signature (format 4) covers a digest of the root, leaf format, epoch, size, pre-epoch checkpoint and, for legacy layers, the claim-hash, report and artifact digests, so a signature can't be moved to another layer or replayed after a rollback.
 
-The domain schema (`layer.schema.json`), `event_id`/fingerprint computation,
-the Merkle algorithm, and the append-only write contract. These are what let a
-layer written by one deployment verify under another — regardless of which
-identity provider was used.
+`SigningConfig` is built by the caller from its own configuration; the library reads no environment variables.
 
-## In-process SDK path
+| `method` | Signs with |
+|---|---|
+| `keypair` | cosign 3 and a private key (`key_path`); offline, no transparency-log upload |
 
-`LedgerClient` (`traust_ledger.client`) is the in-process Python SDK. It
-requires an OIDC token at construction (`LAAS_TOKEN`) and stamps actor identity
-on every operation. All integrity guarantees (Merkle, signing) apply.
+## Verification
 
-`LedgerWriter` is internal — consumers use `LedgerClient`, CLI, or REST API.
+`verify_merkle_integrity(layer)` returns findings (errors and warnings; empty means clean):
+
+- root and size recomputed from the stored events match the metadata
+- epoch in range; pre-epoch checkpoint matches
+- known leaf format (format 1 is reported)
+- restated metadata: for each signature-bound field (`claim_hashes`, `audit_report_sha256`, `artifact_digests`) that a restatement event changed, the stored value still equals what the last restatement gave it
+
+`verify_merkle_signature(layer, pubkey_path, *, required=False)` checks the signature with the method the layer declares. An absent signature is an error when `required`; a signature with no public key to check it is a warning.
+
+## Historical layers
+
+Layers written before traust-core (file layers, the old ledger service's database including SCI's, leaf format 1 or 2, signature formats 1 to 4, restatement chains) verify with the same two functions. They're kept as signed artifacts, never loaded into traust-core's ledger tables, which have no place for their legacy metadata. Nothing in a signed layer is rewritten.

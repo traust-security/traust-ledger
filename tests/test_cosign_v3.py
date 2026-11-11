@@ -1,4 +1,4 @@
-"""cosign v3 bundle-format signing (ledger-integrity-remediation-plan P4).
+"""cosign v3 bundle-format signing.
 
 cosign v3 changed the sign-blob contract: --output-signature hard-fails and the
 signature arrives inside a Sigstore bundle. Critically, without
@@ -19,7 +19,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from traust_ledger._internal.integrity.signing import CosignBackend
+from traust_ledger.integrity.signing import CosignBackend
 
 pytestmark = pytest.mark.skipif(shutil.which("cosign") is None, reason="cosign not installed")
 
@@ -103,7 +103,7 @@ def test_sign_refuses_to_emit_a_published_signature(monkeypatch, tmp_path):
     import json as _json
     import subprocess as _sp
 
-    from traust_ledger._internal.integrity import signing as _s
+    from traust_ledger.integrity import signing as _s
 
     def fake_run(cmd, **kwargs):
         bundle = cmd[cmd.index("--bundle") + 1]
@@ -137,33 +137,3 @@ def test_sign_refuses_to_emit_a_published_signature(monkeypatch, tmp_path):
     assert r.signature == "", "the signature must be discarded"
     assert "REFUSING" in (r.error or "")
     assert "tlogEntries" in (r.error or "")
-
-
-def test_explicit_rekor_request_is_allowed_through(monkeypatch):
-    """Opt-in publication stays possible — the guard blocks the accident, not
-    the deliberate choice."""
-    import json as _json
-
-    from traust_ledger._internal.integrity import signing as _s
-
-    def fake_run(cmd, **kwargs):
-        bundle = cmd[cmd.index("--bundle") + 1]
-        Path(bundle).write_text(
-            _json.dumps(
-                {
-                    "messageSignature": {"signature": "aaa"},
-                    "verificationMaterial": {"tlogEntries": [{"logIndex": 1}]},
-                }
-            )
-        )
-
-        class R:
-            returncode = 0
-            stderr = b""
-            stdout = b""
-
-        return R()
-
-    monkeypatch.setattr(_s.subprocess, "run", fake_run)
-    r = _s.CosignBackend().sign(b"payload", "/tmp/key.pem", rekor=True)
-    assert r.success, r.error

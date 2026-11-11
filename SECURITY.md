@@ -15,14 +15,14 @@ enabled for your account.
 
 Please include:
 
-- The affected component and commit or release tag
-- A description of the issue and its impact
+- The affected function or module and the commit
+- A description of the issue and its impact (for example, a layer that verifies when it shouldn't)
 - Reproduction steps or a proof of concept where possible
 
 ## Scope
 
-This policy covers the traust-ledger disposition-ledger kernel.
+This policy covers `traust_ledger.integrity`: canonical event bytes, the Merkle tree and its proofs, signing and verification. Storage, authentication and who may write live in traust-core and fall under its policy.
 
 ## Supported Versions
 
-Only the current `main` branch receives security fixes.
+There are no releases: consumers pin a commit. Fixes land on `development`; consumers take them by moving their pin.

@@ -1,17 +1,12 @@
-# Reviewer routing — pair with the forge's branch protection:
-#   (owners are the @traust-security/traust-admins team; adjust to your fork)
-#   - Require CODEOWNERS approval on main
-#   - Require pipeline success before merge
-#
+# Reviewer routing: the @traust-security/traust-admins team. On `development`, required
+# checks gate merges; code-owner review requests reviewers (see the rulesets).
 
 /src/traust_ledger/ @traust-security/traust-admins
 /tests/ @traust-security/traust-admins
 
-/.gitlab-ci.yml @traust-security/traust-admins
 /.githooks/ @traust-security/traust-admins
 /CODEOWNERS @traust-security/traust-admins
 /ci/gates.py @traust-security/traust-admins
-/release.py @traust-security/traust-admins
 /Makefile @traust-security/traust-admins
 
 * @traust-security/traust-admins

@@ -6,7 +6,7 @@ import copy
 
 import pytest
 
-from traust_ledger._internal.integrity import (
+from traust_ledger.integrity import (
     Severity,
     stamp_merkle_metadata,
     verify_merkle_integrity,
@@ -96,8 +96,16 @@ class TestPreEpochCheckpoint:
         assert verify_merkle_integrity(layer) == []
 
 
+class TestEpochType:
+    @pytest.mark.parametrize("bad_epoch", [None, "x", float("inf")])
+    def test_non_numeric_epoch_is_error(self, bad_epoch: object) -> None:
+        layer = _stamped_layer([_event()])
+        layer["metadata"]["merkle_epoch"] = bad_epoch
+        assert any("merkle_epoch" in msg for msg in _error_messages(layer))
+
+
 class TestLeafFormat:
-    @pytest.mark.parametrize("bad_format", ["nope", 99, None])
+    @pytest.mark.parametrize("bad_format", ["nope", 99, None, float("inf")])
     def test_unknown_leaf_format_is_error(self, bad_format: object) -> None:
         layer = _stamped_layer([_event()])
         layer["metadata"]["leaf_format"] = bad_format

@@ -9,7 +9,7 @@ tests pin the severity, not just the message.
 
 from __future__ import annotations
 
-from traust_ledger._internal.integrity import (
+from traust_ledger.integrity import (
     Severity,
     stamp_merkle_metadata,
     verify_merkle_integrity,
@@ -57,7 +57,7 @@ class TestLegacyLeafFormatIsAnError:
         stamp_merkle_metadata(layer)
         # Re-root under the legacy binding so the root stays self-consistent
         # and leaf_format is the only thing under test.
-        from traust_ledger._internal.integrity.merkle import compute_merkle_root
+        from traust_ledger.integrity.merkle import compute_merkle_root
 
         root, size = compute_merkle_root(layer["events"], leaf_format=1)
         layer["metadata"]["merkle_root"] = root

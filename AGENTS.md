@@ -1,128 +1,27 @@
 # traust-ledger
 
-Python 3.11+ library (`traust_ledger`). Disposition-ledger kernel — small, reviewed line-by-line.
+Python 3.11+ library (`traust_ledger.integrity`): the ledger's integrity primitives. Small, reviewed line by line, changed rarely.
 
-- **Before done:** `make lint-fix` then `make test` — CI enforces both; do not skip
-- **Lint:** line length 100; ruff E/W/F/I/UP/B/SIM/PTH/RUF (`pyproject.toml`) — `Path` not `os.path`, no bare `except: pass`
-- **Commits:** conventional `type(scope): subject` (`feat`, `fix`, `perf`, `chore`, `ci`, …)
-- **Releases:** `feat`/`fix`/`perf`/breaking MRs need `make check-release`, `VERSION` + `CHANGELOG.md` bump
-- **Scope:** smallest diff; identity/event math changes may need golden-vector updates in contracts
-- **Downstream pin:** `traust-engine` and `traust` each carry a direct
-  `[tool.uv.sources]` pin on this repo (`rev = "<sha>"`, not a tag). After
-  merging here, bump the pin to the new commit in both (engine first, then
-  traust), `uv lock`, and run each repo's own tests before opening its PR.
-- **Setup:** `make setup` once per clone (hooks). More: [CONTRIBUTING.md](CONTRIBUTING.md), [README.md](README.md)
+- **Before done:** `make lint-fix` then `make test`; CI enforces both
+- **Lint:** line length 100; ruff E/W/F/I/UP/B/SIM/PTH/RUF (`pyproject.toml`)
+- **Commits:** conventional `type(scope): subject`
+- **Drift ratchet:** CI runs traust-core's ratchet over `src`; `.ratchet.json` only shrinks. Its one entry is cosign's `subprocess` in `signing.py`; env, clock, file writes, HTTP and DB stay at zero (see *What doesn't*)
+- **No releases:** consumers pin by commit SHA. After a merge, traust-core bumps its `[tool.uv.sources]` pin and runs its ledger tests
+- **Format changes** (leaf bytes, signature payload, verification rules) must keep historical layers verifying: add a format number, never change an old one
 
-## Two-tier public surface
+## What lives here
 
-### SDK tier (import freely, no auth)
+| Module | Does |
+|---|---|
+| `integrity/merkle.py` | canonical event bytes, RFC 6962-style tree, inclusion and consistency proofs, appends from a frontier |
+| `integrity/signing.py` | `SigningConfig`; cosign keypair backend |
+| `integrity/ledger.py` | stamp, sign and verify a layer document; signature payload formats |
+| `integrity/restatements.py` | restatement chain replay for verifying signature-bound metadata |
 
-Pure computation — deterministic algorithms consumers need for pre-validation,
-matching, and preparing data before submission.
+## What doesn't
 
-| Module | Exports | SDK migration candidate |
-|--------|---------|------------------------|
-| `traust_ledger.api.identity` | `fingerprint`, `canon_path`, `canon_repo`, `primary_cwe`, `ALGO_VERSION` | Yes |
-| `traust_ledger.api.events` | `compute_event_id`, `compute_claim_hash`, `aliases_from_events`, `findings_from_events`, `attach_identity`, `make_alias_event`, `apply_restatements`, `terminal_value` | Yes |
-| `traust_ledger.api.disposition` | `derive_disposition`, `is_actor_verified`, `event_class` | Yes |
-| `traust_ledger.api.integrity` | `verify_merkle_integrity`, `verify_merkle_signature`, `stamp_merkle_metadata`, `IntegrityFinding`, `Severity` | No |
-| `traust_ledger.api.reports` | `report_sha256`, `check_report_digest`, `check_artifact_digests` | No |
-
-These are stable public paths. `_internal/` may refactor freely underneath.
-
-### Gated tier (OIDC-enforced)
-
-All state changes go through one of three entry points, each stamping OIDC
-identity onto the actor. `LedgerWriter` is internal and NOT importable.
-
-| Entry point | Usage |
-|-------------|-------|
-| `LedgerClient` | In-process Python SDK (`traust_ledger.client`) |
-| CLI | `ledger sign`, `ledger submit`, etc. |
-| REST API | `traust_ledger.service` (FastAPI) |
-
-| Command | Purpose |
-|---------|---------|
-| `ledger submit` | Batch event + queue submission |
-| `ledger countersign` | Two-person countersign |
-| `ledger sign` | Sign a layer's Merkle root |
-| `ledger verify-signature` | Verify a Merkle root signature |
-| `ledger resolve` | Resolve a needs_review item |
-| `ledger fingerprint` | Stamp identity on a report (in-place write) |
-| `ledger verify` | Merkle integrity check |
-| `ledger restate` | Administratively restate signature-bound metadata (admin-gated append) |
-| `ledger migrate` | Administratively copy validated historical layers into normalized storage |
-| `ledger materialize` | Populate SQL projection |
-| `ledger query` | findings / events / layers |
-
-### Boundary rule
-
-If it **changes the ledger** → CLI/REST (OIDC enforced). Historical migration is
-a separate explicit administrative path; it never submits old events as new ones.
-If it **computes or reads** → importable from SDK-tier modules.
-
-### Database integrity rules
-
-- `events` is append-only: existing payloads must be an exact prefix; only suffix inserts.
-- **Restatements cover METADATA only.** Overwriting signature-bound metadata
-  (`claim_hashes`, `audit_report_sha256`, `artifact_digests`) requires a write that also
-  appends a restatement recording the prior value, the actor and an authorising ticket;
-  `LedgerWriter` enforces it and `patch_metadata` refuses the overwrite. First writes
-  and per-key additions pass freely. Event content is NOT correctable — supersede it
-  with a later event. Never add a read-time overlay: the v1→v2 normaliser is the one
-  read-time transform.
-- Append-only triggers are shipped by `traust-contracts` in the DDL itself. Ledger's
-  guard installation is idempotent (`IF NOT EXISTS` / `DROP + CREATE`).
-- Never add event `UPDATE`, `DELETE`, replacement, or truncation paths.
-- `layers` is the mutable current envelope but cannot be deleted.
-- `materialized_findings` is rebuildable and never integrity authority.
-- PostgreSQL e2e: `make db-up` then `make test-integration` (`LEDGER_TEST_DATABASE_URL`).
-- File, SQLite, and PostgreSQL storage lifecycle changes require `tests/test_storage_e2e.py`.
-
-## Three-entry-point symmetry
-
-Every write operation MUST work identically through the REST API, the `ledger`
-CLI, and `LedgerClient`. All three converge on the same handlers
-(`traust_ledger.handlers.*`). The internal layer (`_internal/writer.py`) raises
-plain exceptions (`ValueError` subclasses). The service layer converts them to
-`ServiceError` (→ HTTP status); the CLI to exit codes; `LedgerClient` to
-`LedgerError`.
-
-If you add a new error path to the writer, handle it in the handler layer —
-all three entry points pick it up.
-
-### Config split
-
-`ServiceConfig` (`traust_ledger.config`) is a plain `BaseModel` — importable
-with no optional deps. `ServiceSettings` (`traust_ledger.service.settings`)
-extends it with `pydantic_settings.BaseSettings` for env-auto-loading;
-only the REST app uses it. The CLI uses `config_from_env()` in
-`traust_ledger.cli`. `LedgerClient` constructs `ServiceConfig` with explicit
-kwargs.
-
-## Extraction candidates (mixed concerns)
-
-These modules have documented seams. Do NOT add more cross-concern code to them.
-If you feel the urge to put filesystem traversal next to signing logic, stop and ask
-the module owner first. The answer is no.
-
-| Module | Mixed concerns | Target extraction |
-|--------|---------------|-------------------|
-| `_internal/reports.py` | hashing, signing lifecycle, filesystem traversal, metadata mutation | See module docstring |
-| `_internal/writer.py` | `resolve_review_item` (queue semantics) + `_enforce_identity_rule` (authn policy) + schema validation + backend I/O — all in one class | Queue ops → own module; identity rule → `_internal/identity` or gates; validation → caller or middleware |
-| `_internal/disposition.py` | `is_actor_verified` is an identity concern imported by `writer.py` — it's the actor-auth check living in the merge engine | → `_internal/identity` (the fingerprint module is NOT the right place either) |
-
-Modules that are clean (single concern, leave alone):
-- `_internal/identity.py` — fingerprint recipe only
-- `_internal/hashing.py` — sha256 utility
-- `_internal/errors.py` — plain exception defs
-- `_internal/backends/` — storage protocol + impls
-- `_internal/projection.py` — materialized findings schema (used by materialize CLI only)
-
-## Ownership boundary
-
-traust-ledger does NOT own:
-- Tree iteration (which directories exist, naming conventions, skip-lists)
-- Cross-layer joins or aggregation
-- Dashboard queries or compliance scoring
-- Deployment topology awareness
+- **State:** no database, files or object storage; the caller stores layers and events (traust-core)
+- **Domain:** what an event contains, finding identity, dispositions, gates, who may write: traust-core
+- **Transport and auth:** the platform API (traust-core)
+- **Configuration:** no environment variables; the caller passes a `SigningConfig`
+- **Dependencies:** none required; `sigstore` only for keyless signing

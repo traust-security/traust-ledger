@@ -9,32 +9,41 @@ and tamper detection — mirroring build_cumulative → validate → sign → co
 from __future__ import annotations
 
 import base64
+import hashlib
 import hmac
 import json
-import os
 import re
 from pathlib import Path
 
-from traust_ledger._internal.integrity import (
+from traust_ledger.integrity import (
     Severity,
     stamp_merkle_metadata,
     verify_merkle_integrity,
     verify_merkle_signature,
 )
-from traust_ledger._internal.integrity.ledger import merkle_root_payload
-from traust_ledger._internal.integrity.merkle import (
+from traust_ledger.integrity.ledger import merkle_root_payload
+from traust_ledger.integrity.merkle import (
     compute_merkle_root,
     consistency_proof,
     inclusion_proof,
     verify_consistency,
     verify_inclusion,
 )
-from traust_ledger._internal.integrity.signing import (
+from traust_ledger.integrity.signing import (
     SigningBackend,
     SignResult,
     VerifyResult,
 )
-from traust_ledger.api.events import compute_event_id
+
+
+def compute_event_id(
+    source_ref: str, finding_ref: str, validity: str | None, resolution: str | None
+) -> str:
+    """Sample event ids, same formula the ledger used (sha256 of the joined fields)."""
+    return hashlib.sha256(
+        f"{source_ref}|{finding_ref}|{validity or ''}|{resolution or ''}".encode()
+    ).hexdigest()
+
 
 F1 = "TEST_WIDGET-abcdef0-001"
 F2 = "TEST_WIDGET-abcdef0-002"
@@ -66,7 +75,7 @@ class HmacTestBackend(SigningBackend):
     def available(self) -> bool:
         return True
 
-    def sign(self, payload: bytes, key_path: str, *, rekor: bool = False) -> SignResult:
+    def sign(self, payload: bytes, key_path: str) -> SignResult:
         sig = hmac.new(self._secret, payload, "sha256").digest()
         return SignResult(signature=base64.b64encode(sig).decode(), success=True)
 
@@ -135,7 +144,7 @@ def _warnings(findings: list) -> list:
 def _event_entries(events: list[dict]) -> list[bytes]:
     # leaf_format 2 (v0.199.0): leaves are the canonical full-event bytes,
     # not event_ids — proofs must hash the same material the stamp did
-    from traust_ledger._internal.integrity.merkle import (
+    from traust_ledger.integrity.merkle import (
         canonical_event_bytes,
     )
 
@@ -575,10 +584,9 @@ def test_e2e_ci_merkle_pipeline(tmp_path: Path) -> None:
     assert stripped["metadata"].get("merkle_root"), (
         "Step 15: precondition — layer should have merkle_root"
     )
-    os.environ["HARNESS_SIGNING_REQUIRED"] = "1"
     stripped["metadata"].pop("merkle_root_signature", None)
-    sig_findings = verify_merkle_signature(stripped, key_path, backend=backend)
-    # v0.202.0 (self-audit -006): under HARNESS_SIGNING_REQUIRED=1 a
+    sig_findings = verify_merkle_signature(stripped, key_path, backend=backend, required=True)
+    # v0.202.0 (self-audit -006): with signing required a
     # stripped signature is an ERROR, not a warning — deleting the
     # signature must never be a downgrade path
     stripped_errors = _errors(sig_findings)
@@ -586,7 +594,6 @@ def test_e2e_ci_merkle_pipeline(tmp_path: Path) -> None:
     assert any("absent" in f.message for f in stripped_errors), (
         "Step 15: error should indicate the signature is absent"
     )
-    os.environ.pop("HARNESS_SIGNING_REQUIRED", None)
 
 
 def test_signing_method_mismatch(tmp_path: Path) -> None:

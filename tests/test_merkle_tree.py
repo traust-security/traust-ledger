@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from traust_ledger._internal.integrity.merkle import (
+from traust_ledger.integrity.merkle import (
     compute_merkle_root,
     compute_pre_epoch_checkpoint,
     compute_root,
@@ -213,7 +213,7 @@ class TestHarnessWrappers:
         assert compute_merkle_root(events, leaf_format=1) == (expected_root, 3)
 
     def test_compute_merkle_root_v2_binds_full_content(self) -> None:
-        from traust_ledger._internal.integrity.merkle import canonical_event_bytes
+        from traust_ledger.integrity.merkle import canonical_event_bytes
 
         events = [
             {
@@ -322,7 +322,7 @@ class TestVerifyConsistencyNegative:
 
 class TestUpdateLayerMerkleMetadata:
     def test_empty_layer(self) -> None:
-        from traust_ledger._internal.integrity import stamp_merkle_metadata
+        from traust_ledger.integrity import stamp_merkle_metadata
 
         layer = {"metadata": {}, "events": []}
         stamp_merkle_metadata(layer)
@@ -333,7 +333,7 @@ class TestUpdateLayerMerkleMetadata:
     def test_refuses_negative_epoch(self) -> None:
         import pytest
 
-        from traust_ledger._internal.integrity import stamp_merkle_metadata
+        from traust_ledger.integrity import stamp_merkle_metadata
 
         layer = {
             "metadata": {"merkle_epoch": -1},
@@ -345,7 +345,7 @@ class TestUpdateLayerMerkleMetadata:
     def test_refuses_epoch_on_empty_events(self) -> None:
         import pytest
 
-        from traust_ledger._internal.integrity import stamp_merkle_metadata
+        from traust_ledger.integrity import stamp_merkle_metadata
 
         layer = {"metadata": {"merkle_epoch": 1}, "events": []}
         with pytest.raises(ValueError, match="empty"):

@@ -16,9 +16,9 @@ Conventional commits required. Format: `type(scope): subject`
 Types: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `chore`, `ci`, `build`, `style`, `revert`
 
 ```
-feat(identity): add fingerprint helper
-fix(writer): enforce ldap_verified on human-fp
-perf!: change claim hash recipe          ← breaking change
+feat(merkle): consistency proofs across epochs
+fix(signing): surface a missing cosign binary
+feat(ledger)!: signature format 5          ← breaking change
 ```
 
 ## Hooks
@@ -29,37 +29,17 @@ perf!: change claim hash recipe          ← breaking change
 | `pre-commit` | ruff lint on staged `.py` | <1s |
 | `pre-push` | full lint + unit tests | ~10s |
 
-Bypass: `--no-verify` on commit or push. CI still enforces.
+Don't bypass the hooks (`--no-verify`): fix what they find. CI enforces the same checks.
 
-## Releasing
+## CI
 
-If your MR has `feat:`, `fix:`, `perf:`, or `!` (breaking) commits:
+Pull requests and pushes to `development`: lint, tests (Python 3.11 and 3.12) with cosign
+installed, and — on pull requests — the conventional-commit check over the PR's commits.
+The hook is local and bypassable; CI is the gate.
 
-```bash
-make bump minor
-# add ## [X.Y.Z] section to CHANGELOG.md
-make check-release
-git add VERSION pyproject.toml CHANGELOG.md
-git commit -m "chore: release X.Y.Z"
-```
+## Downstream pin
 
-CI validates on MR. On merge to main, CI tags automatically.
-
-## CI pipeline
-
-**MR:** lint → conventional commits → release-ready → tests
-
-**Main:** tag if `VERSION` > latest git tag
-
-## Downstream pins
-
-Consumers pin this repo by commit sha (`[tool.uv.sources] rev = "<sha>"`), not
-a release tag — a tag needs this repo's own release cut first, a commit
-doesn't. After your change merges to main, bump the pin to the new commit in
-each direct downstream repo's `pyproject.toml`, `uv lock`, and run that
-repo's own tests before opening its PR.
-
-Direct downstream: `traust-engine`, `traust`.
+traust-core pins this repo by commit SHA (`[tool.uv.sources] rev = "<sha>"`); there are no releases. After your change merges, bump the pin in traust-core, `uv lock`, and run its ledger tests (`tests/v1/services/test_ledger.py`) before opening its PR.
 
 ## Running tests
 
@@ -70,4 +50,4 @@ uv run pytest -q
 
 ## Architecture
 
-See [README.md](README.md) for module layout, golden vectors, and consumption.
+See [AGENTS.md](AGENTS.md) for what lives here and what doesn't, and [docs/ledger-integrity.md](docs/ledger-integrity.md) for the formats.

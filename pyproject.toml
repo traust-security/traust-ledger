@@ -1,45 +1,10 @@
 [project]
 name = "traust-ledger"
-version = "0.11.5"
+version = "0.1.0"
 license = "Apache-2.0"
-description = "Disposition-ledger kernel: finding identity, event math, integrity (Merkle + signing), and the single ledger write path"
+description = "Ledger integrity primitives: canonical event bytes, Merkle trees, signing and verification"
 requires-python = ">=3.11"
-dependencies = [
-    # 0.1.1 is the floor: LayerEvent timestamps are IsoTimestamp there, which is
-    # what lets the read paths here drop their own parse guards.
-    "traust-contracts",
-    "jsonschema>=4.0",
-    # Authentication is on the path of every write (LedgerClient -> Authenticator
-    # -> verifier), so the JWT library is not optional. It sat in the `cli` and
-    # `service` extras until 0.17.2, which made `traust-ledger` alone unable to
-    # append an event: ModuleNotFoundError: No module named 'jwt'.
-    # httpx2 stays optional (`cli`) — only OIDC *network* calls need it, and
-    # those import it lazily via traust_ledger.auth._httpx.
-    "PyJWT[crypto]>=2.8",
-]
-
-[project.optional-dependencies]
-# Go DB-backed (SQLAlchemy + PostgreSQL driver). Core is file-based without this.
-db = [
-    "sqlalchemy>=2.0",
-    "psycopg[binary]>=3.1",
-]
-# HTTP service route: DB-backed plus the web stack.
-service = [
-    "sqlalchemy>=2.0",
-    "psycopg[binary]>=3.1",
-    "fastapi>=0.115",
-    "uvicorn[standard]>=0.30",
-    "pydantic-settings>=2.0",
-]
-# CLI helpers, not needed on the HTTP service route.
-cli = ["httpx2"]
-
-[project.scripts]
-ledger = "traust_ledger.cli.main:main"
-
-[tool.uv.sources]
-traust-contracts = { git = "https://github.com/traust-security/traust-contracts.git", rev = "7c56c71ff831c532d58b7a92e9712b9667acb1ff" }
+dependencies = []
 
 [build-system]
 requires = ["hatchling"]
@@ -55,21 +20,14 @@ exclude = ["/.ci-venv", "/.venv"]
 dev = [
     "pytest>=9.1.1",
     "pytest-cov>=6.0",
+    "pytest-xdist>=3",
     "ruff>=0.6",
-    "httpx2",
-    "fastapi>=0.115",
-    "uvicorn[standard]>=0.30",
-    "pydantic-settings>=2.0",
-    "sqlalchemy>=2.0",
-    "pytest-httpserver>=1.1",
 ]
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
 
-[tool.pytest.ini_options]
-markers = ["integration: requires Docker services (mockserver)"]
 
 [tool.coverage.run]
 source = ["traust_ledger"]
