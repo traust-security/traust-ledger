@@ -177,7 +177,7 @@ class CosignBackend(SigningBackend):
     def available(self) -> bool:
         return shutil.which("cosign") is not None
 
-    # cosign v3 compatibility (2026-08-12).
+    # cosign v3 compatibility.
     #
     # v3 changed the sign-blob contract this backend targeted under v2:
     #   * --output-signature is deprecated and now HARD-FAILS ("must specify
@@ -185,11 +185,10 @@ class CosignBackend(SigningBackend):
     #     inside a Sigstore bundle written to a file, not on stdout.
     #   * --tlog-upload=false is rejected while the default signing config is
     #     active, and WITHOUT it cosign uploads to the PUBLIC rekor.sigstore.dev
-    #     by default. For an internal security ledger that is unacceptable: it
+    #     by default. For a private security ledger that is unacceptable: it
     #     publishes the timing of ledger writes to an irrevocable public log,
     #     makes signing depend on Sigstore's availability, and inflates the
-    #     bundle from ~390 bytes to ~3.8 KB (about 84 MB across a 22k-layer
-    #     corpus). --use-signing-config=false restores the offline path.
+    #     bundle. --use-signing-config=false restores the offline path.
     #
     # Also fixed here: the v2 code piped the payload on stdin but never passed
     # the positional blob argument, so every invocation failed with "requires

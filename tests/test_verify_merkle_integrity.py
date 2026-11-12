@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Enforcement severities in verify_merkle_integrity (plan P6).
+"""Enforcement severities in verify_merkle_integrity.
 
-Both cases below were WARNING until 2026-08-14 and had no test asserting
-either severity, so the anti-pattern the plan describes — a check that
-exists but does not enforce — could have been reintroduced silently. These
-tests pin the severity, not just the message.
+These tests pin the severity, not just the message, so checks cannot silently
+stop enforcing integrity requirements.
 """
 
 from __future__ import annotations
@@ -26,7 +24,7 @@ def _event(n: int = 1) -> dict:
 
 
 class TestMissingRootIsAnError:
-    """P6 flip 1 — a layer with no root has no tamper-evidence at all."""
+    """A layer with no root has no tamper-evidence at all."""
 
     def test_absent_merkle_root_is_error(self) -> None:
         layer = {"metadata": {}, "events": [_event()]}
@@ -36,7 +34,6 @@ class TestMissingRootIsAnError:
         assert "merkle_root absent" in findings[0].message
 
     def test_absent_root_is_error_on_an_empty_layer_too(self) -> None:
-        # 135 of the 143 layers the 2026-08-14 sweep stamped were zero-event.
         # An empty layer still gets an empty-tree root, so "no events" is not
         # an excuse for "no root".
         layer = {"metadata": {}, "events": []}
@@ -50,7 +47,7 @@ class TestMissingRootIsAnError:
 
 
 class TestLegacyLeafFormatIsAnError:
-    """P6 flip 2 — leaf_format 1 binds event_ids only, not event content."""
+    """Leaf format 1 binds event IDs only, not event content."""
 
     def _legacy_layer(self) -> dict:
         layer = {"metadata": {}, "events": [_event(1), _event(2)]}

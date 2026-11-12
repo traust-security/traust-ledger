@@ -120,13 +120,6 @@ def stamp_merkle_metadata(layer: dict) -> bool:
     # verifier. Drop it here rather than in sign_if_configured, so it happens
     # exactly when the root actually changed — a re-stamp that produces the same
     # root leaves a still-valid signature alone.
-    #
-    # Found 2026-08-17: a 5.0 embargo backfill appended events to 9
-    # signed layers with no signing key configured, so sign_if_configured
-    # no-oped as `unconfigured` and all 9 kept a signature over the old root.
-    # Every one failed verification. Until the key reaches the write path
-    # (plan P8), any corpus pass that rewrites signed layers reproduces that at
-    # scale — which is precisely what plan items B7 and P2's 417 layers do.
     if prior_root is not None and prior_root != root:
         for key in (
             "merkle_root_signature",
@@ -453,12 +446,11 @@ def merkle_signature_payload(meta: dict, fmt: int = SIGNATURE_FORMAT_CURRENT) ->
     A bare-root signature (format 1) can be transplanted onto any layer
     that reproduces the same root, replayed after a rollback to a
     previously-signed state, or re-scoped by editing leaf_format/epoch
-    under the same signature (self-audit -005b/-006). Format 2 signs a
-    digest over the root plus leaf_format, epoch, size, the pre-epoch
-    checkpoint, and a digest of metadata.claim_hashes — so a signed
-    layer also pins its baseline claim hashes (self-audit -014).
+    under the same signature. Format 2 signs a digest over the root plus
+    leaf_format, epoch, size, the pre-epoch checkpoint, and a digest of
+    metadata.claim_hashes — so a signed layer also pins its baseline claim hashes.
 
-    **Format 3 (2026-08-18, plan §4.4.0a) adds `audit_report_sha256`.**
+    **Format 3 adds `audit_report_sha256`.**
     Without it the digest recording *which bytes this layer annotates* sat
     outside the signature, so anyone able to write the layer could point it at a
     substituted report by rewriting the digest to match — provenance, but not
@@ -466,7 +458,7 @@ def merkle_signature_payload(meta: dict, fmt: int = SIGNATURE_FORMAT_CURRENT) ->
     claims and what a verifier can check: events (via the root), claims (via the
     claim-hash digest), and now the annotated report itself.
 
-    **No format 5 for restatements (2026-09-01).** A restatement is an appended
+    **No format 5 for restatements.** A restatement is an appended
     event, so it is inside `merkle_root`, and the values it authorises are
     already bound by format 4. A new format would re-sign every existing
     layer to bind data that is bound already.
@@ -496,15 +488,8 @@ def merkle_signature_payload(meta: dict, fmt: int = SIGNATURE_FORMAT_CURRENT) ->
         # invalidates the signature rather than passing silently.
         doc["audit_report_sha256"] = meta.get("audit_report_sha256")
     if fmt >= 4:
-        # **Format 4 (2026-08-21, plan R1) adds a digest over
-        # `metadata.artifact_digests`.** Format 3 binds the ONE report a layer
-        # annotates; every other artifact beside it — triage, threat model,
-        # findings-current, verification, privilege profile — had no digest
-        # anywhere, so 85% of what is being copied to object storage could not be
-        # verified after the move. That is acceptable while git still holds the
-        # original and unacceptable as a basis for deleting it, which is the
-        # entire point of the migration. Binding the map, not the files, keeps
-        # this one field per layer instead of one per artifact.
+        # Format 4 binds a digest of `metadata.artifact_digests` as well as
+        # the annotated report, so other artifacts can also be verified.
         arts = meta.get("artifact_digests")
         doc["artifact_digests_digest"] = (
             hashlib.sha256(

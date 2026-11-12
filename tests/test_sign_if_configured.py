@@ -82,16 +82,15 @@ def test_stamping_uses_the_current_leaf_format():
     assert L["metadata"]["merkle_size"] == 3
 
 
-# --- stale-signature drop (2026-08-17) -------------------------------------
+# --- stale-signature drop -------------------------------------------------
 #
 # A signature covers one root. When the events change, the stored signature
 # stops describing the layer, and leaving it there is worse than having none: a
-# verifier cannot tell a present-but-invalid signature from tampering. Found on
-# 9 layers a 5.0 embargo backfill appended to with no key configured.
+# verifier cannot tell a present-but-invalid signature from tampering.
 
 
 def _signed_layer(n=1):
-    """Stamped, then hand-signed — the state the 2026-08-14 bulk pass left."""
+    """Create a stamped layer with a signature."""
     layer = _layer(n)
     stamp_merkle_metadata(layer)
     layer["metadata"]["merkle_root_signature"] = "MEUCIQD-fake-signature"
